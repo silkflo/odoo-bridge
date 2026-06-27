@@ -32,7 +32,7 @@ The bridge is **read-only**. It uses the Odoo ORM, sends **no SQL to Odoo**, and
 
 For Odoo 19.0 users, the recommended path is the official Odoo Bridge module.
 
-1. Install the Speak To Your Database Odoo Bridge from the Odoo Apps marketplace once the listing is available.
+1. Install the Speak To Your Database Odoo Bridge from the Odoo Apps marketplace.
 2. Configure the bridge in Odoo.
 3. Connect it in Speak To Your Database under [Settings → Odoo](https://speaktoyourdatabase.com/settings?tab=odoo).
 
