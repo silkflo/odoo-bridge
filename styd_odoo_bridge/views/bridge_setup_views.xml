@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Connection Setup wizard (token lifecycle). Editable form; no search view,
+         so the Odoo 19 search-view rules (no <group>/expand) cannot apply. -->
+    <record id="view_styd_bridge_setup_wizard_form" model="ir.ui.view">
+        <field name="name">styd.odoo.bridge.setup.wizard.form</field>
+        <field name="model">styd.odoo.bridge.setup.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Speak To Your Database — Connection Setup">
+                <header>
+                    <button name="action_save_settings" type="object"
+                            string="Save Settings" class="btn-primary"/>
+                    <button name="action_generate_token" type="object"
+                            string="Generate Token" class="btn-secondary"
+                            invisible="token_configured"/>
+                    <button name="action_rotate_token" type="object"
+                            string="Rotate Token" class="btn-secondary"
+                            invisible="not token_configured"
+                            confirm="Rotating replaces the current token. Speak To Your Database must be updated with the new token. Continue?"/>
+                    <button name="action_revoke_token" type="object"
+                            string="Revoke Token" class="btn-danger"
+                            invisible="not token_configured"
+                            confirm="Revoking clears the token and disables the bridge. Continue?"/>
+                    <button name="action_open_bridge_status" type="object"
+                            string="Open Bridge Status"/>
+                    <button name="action_open_access_logs" type="object"
+                            string="Open Access Logs"/>
+                </header>
+                <sheet>
+                    <field name="has_generated_token" invisible="1"/>
+                    <field name="legacy_plaintext_token_present" invisible="1"/>
+
+                    <div class="oe_title">
+                        <h1>Speak To Your Database &#8212; Connection Setup</h1>
+                        <p class="text-muted">
+                            Generate and manage the bridge token, choose the connector owner,
+                            and enable or disable the bridge. The raw token is shown only once
+                            at generation and is stored only as a hash.
+                        </p>
+                    </div>
+
+                    <!-- One-time generated token -->
+                    <div class="alert alert-success" role="alert"
+                         invisible="not has_generated_token">
+                        <h3 class="mb-1">Copy this token now. It will not be shown again.</h3>
+                        <field name="generated_token" readonly="1" nolabel="1"/>
+                        <p class="mt-2 mb-1">
+                            Paste this token into Speak To Your Database &#8594; Settings &#8594; Odoo now:<br/>
+                            <a href="https://speaktoyourdatabase.com/settings?tab=odoo"
+                               target="_blank" rel="noreferrer noopener">https://speaktoyourdatabase.com/settings?tab=odoo</a>
+                        </p>
+                        <p class="mb-0">
+                            It is stored in Odoo only as a hash, so once you leave this page it cannot be
+                            retrieved. Use <strong>Rotate Token</strong> to issue a new one.
+                        </p>
+                    </div>
+
+                    <!-- Legacy plaintext token warning -->
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not legacy_plaintext_token_present">
+                        <strong>Legacy token storage detected.</strong>
+                        A plaintext token from an earlier setup is still stored. Click
+                        <strong>Rotate Token</strong> to upgrade to hashed-at-rest storage
+                        and clear the plaintext token.
+                    </div>
+
+                    <group string="Bridge">
+                        <field name="bridge_enabled" widget="boolean_toggle"/>
+                        <field name="token_configured" widget="boolean_toggle" readonly="1"/>
+                        <field name="connector_owner_user_id" options="{'no_create': True}"/>
+                        <field name="base_url" readonly="1"/>
+                    </group>
+
+                    <separator string="Connect Speak To Your Database"/>
+                    <div>
+                        <p>To connect this Odoo instance to Speak To Your Database:</p>
+                        <ol>
+                            <li>Set <strong>Bridge Enabled</strong> to Yes and choose a
+                                <strong>Connector Owner</strong>, then click <strong>Save Settings</strong>.</li>
+                            <li>Click <strong>Generate Token</strong> or <strong>Rotate Token</strong>,
+                                then copy the token shown once.</li>
+                            <li>Open <strong>Speak To Your Database</strong> &#8594;
+                                <strong>Settings</strong> &#8594; <strong>Odoo</strong>.</li>
+                            <li>Paste the <strong>Bridge Token</strong> and confirm the
+                                <strong>Odoo Base URL</strong>.</li>
+                            <li>Click <strong>Test connection</strong>, then <strong>Save connection</strong>.</li>
+                            <li>Verify the connection on the <strong>Bridge Status</strong> page and review the
+                                <strong>Access Logs</strong> if needed.</li>
+                        </ol>
+                        <p>
+                            Open Speak To Your Database Odoo settings:<br/>
+                            <a href="https://speaktoyourdatabase.com/settings?tab=odoo"
+                               target="_blank" rel="noreferrer noopener">https://speaktoyourdatabase.com/settings?tab=odoo</a>
+                        </p>
+                        <p class="text-muted">
+                            The raw token is shown only once at generation; it is never displayed
+                            again, never stored in clear text, and never written to the access logs.
+                        </p>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action: open the Connection Setup wizard. -->
+    <record id="action_styd_bridge_setup" model="ir.actions.act_window">
+        <field name="name">Connection Setup</field>
+        <field name="res_model">styd.odoo.bridge.setup.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_styd_bridge_setup_wizard_form"/>
+        <field name="target">current</field>
+        <field name="context">{}</field>
+    </record>
+
+    <!-- Menu: Connection Setup under the existing Speak To Your Database root. -->
+    <menuitem id="menu_styd_bridge_setup"
+              name="Connection Setup"
+              parent="menu_styd_bridge_root"
+              action="action_styd_bridge_setup"
+              groups="base.group_system"
+              sequence="7"/>
+</odoo>

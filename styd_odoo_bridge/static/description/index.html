@@ -1,0 +1,789 @@
+<!--
+  Speak To Your Database — Odoo Bridge
+  Odoo Apps marketplace description page — LOCAL DRAFT / PREVIEW ONLY.
+  Self-contained: no JavaScript, no external CDN, no external images.
+  Styles are scoped under .sbd-desc so they do not leak on the Apps page.
+-->
+<section class="sbd-desc">
+  <style>
+    .sbd-desc {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1f2733;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .sbd-desc * {
+      box-sizing: border-box;
+    }
+
+    .sbd-desc .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    .sbd-desc h1,
+    .sbd-desc h2,
+    .sbd-desc h3 {
+      margin: 0 0 .4em;
+      line-height: 1.25;
+      color: #10203a;
+    }
+
+    .sbd-desc h2 {
+      font-size: 26px;
+      font-weight: 700;
+    }
+
+    .sbd-desc h3 {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .sbd-desc p {
+      margin: 0 0 14px;
+    }
+
+    .sbd-desc a {
+      color: #2454c6;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .sbd-desc code {
+      background: #eef1f6;
+      padding: 2px 6px;
+      border-radius: 5px;
+      color: #46505f;
+    }
+
+    .sbd-desc .muted {
+      color: #5b6573;
+    }
+
+    .sbd-desc section,
+    .sbd-desc .band {
+      padding: 46px 0;
+    }
+
+    .sbd-desc .band-alt {
+      background: #f5f7fb;
+    }
+
+    /* Hero */
+    .sbd-hero {
+      background: linear-gradient(135deg, #16224a 0%, #23357e 55%, #2f8f86 130%);
+      color: #eef2fb;
+      padding: 56px 0 50px;
+    }
+
+    .sbd-hero .logo {
+      width: 64px;
+      height: 64px;
+      border-radius: 14px;
+      display: block;
+      margin: 0 auto 18px;
+      background: #ffffff14;
+      border: 1px solid #ffffff33;
+      object-fit: contain;
+    }
+
+    .sbd-hero h1 {
+      color: #fff;
+      font-size: 34px;
+      font-weight: 800;
+      text-align: center;
+      letter-spacing: -.3px;
+    }
+
+    .sbd-hero .sub {
+      text-align: center;
+      font-size: 18px;
+      color: #cfd8ef;
+      max-width: 680px;
+      margin: 6px auto 22px;
+    }
+
+    .sbd-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .sbd-badge {
+      display: inline-block;
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      background: #ffffff1a;
+      border: 1px solid #ffffff3d;
+      color: #fff;
+      text-decoration: none;
+    }
+
+    .sbd-badge:hover {
+      color: #fff;
+      text-decoration: none;
+      opacity: .9;
+    }
+
+    .sbd-badge.beta {
+      background: #ffd86b;
+      color: #3a2c00;
+      border-color: #ffd86b;
+    }
+
+    /* Generic layout helpers */
+    .sbd-lead {
+      font-size: 18px;
+      color: #46505f;
+      max-width: 760px;
+    }
+
+    .sbd-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 24px;
+    }
+
+    .sbd-grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .sbd-card {
+      background: #fff;
+      border: 1px solid #e4e9f2;
+      border-radius: 14px;
+      padding: 20px 22px;
+    }
+
+    .sbd-card h3 {
+      margin-bottom: 6px;
+    }
+
+    .sbd-card .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: #eaf0ff;
+      color: #23357e;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .sbd-callout {
+      background: #fff;
+      border: 1px solid #d7deea;
+      border-left: 5px solid #23357e;
+      border-radius: 14px;
+      padding: 22px 24px;
+      margin-top: 22px;
+    }
+
+    /* lists with markers */
+    .sbd-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .sbd-list li {
+      position: relative;
+      padding: 6px 0 6px 28px;
+    }
+
+    .sbd-list li::before {
+      content: "\2713";
+      position: absolute;
+      left: 0;
+      top: 6px;
+      color: #0e9f6e;
+      font-weight: 800;
+    }
+
+    .sbd-list.no li::before {
+      content: "\2715";
+      color: #c0392b;
+    }
+
+    .sbd-list.dot li::before {
+      content: "\2022";
+      color: #23357e;
+      font-size: 20px;
+      top: 2px;
+    }
+
+    /* example questions */
+    .sbd-q {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .sbd-q .item {
+      background: #0f1b33;
+      color: #e8eefc;
+      border-radius: 10px;
+      padding: 13px 16px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 14px;
+      border: 1px solid #1d2c4f;
+    }
+
+    .sbd-q .item::before {
+      content: "\203A\00a0";
+      color: #5fd6b6;
+      font-weight: 700;
+    }
+
+    .sbd-answer-meta {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .sbd-chip {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid #d7deea;
+      background: #fff;
+      color: #33404f;
+    }
+
+    .sbd-chip.src {
+      background: #eaf0ff;
+      border-color: #c9d6ff;
+      color: #23357e;
+    }
+
+    .sbd-chip.ok {
+      background: #e8f8f1;
+      border-color: #bfe9d6;
+      color: #0e7a55;
+    }
+
+    /* models */
+    .sbd-models {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .sbd-model {
+      font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+      font-size: 14px;
+      background: #fff;
+      border: 1px solid #d7deea;
+      border-radius: 8px;
+      padding: 9px 13px;
+      color: #23357e;
+    }
+
+    .sbd-model span {
+      color: #7a8699;
+    }
+
+    /* proof stats */
+    .sbd-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    .sbd-stat {
+      text-align: center;
+      background: #fff;
+      border: 1px solid #e4e9f2;
+      border-radius: 14px;
+      padding: 22px 12px;
+    }
+
+    .sbd-stat .big {
+      font-size: 30px;
+      font-weight: 800;
+      color: #10203a;
+    }
+
+    .sbd-stat .lab {
+      font-size: 13px;
+      color: #5b6573;
+      margin-top: 4px;
+    }
+
+    .sbd-note {
+      font-size: 13px;
+      color: #5b6573;
+      margin-top: 16px;
+      font-style: italic;
+    }
+
+    /* screenshots */
+    .sbd-shots {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 24px;
+    }
+
+    .sbd-shot {
+      overflow: hidden;
+      border: 1px solid #d7deea;
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 10px 30px rgba(16, 32, 58, 0.08);
+    }
+
+    .sbd-desc .sbd-shot-link {
+      display: block;
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .sbd-desc .sbd-shot-link:hover {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .sbd-shot img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      height: auto;
+      object-fit: cover;
+      object-position: top center;
+      background: #0f172a;
+      border-bottom: 1px solid #e4e9f2;
+    }
+
+    .sbd-shot-caption {
+      padding: 14px 16px 16px;
+    }
+
+    .sbd-shot .t {
+      font-weight: 700;
+      color: #33404f;
+      text-decoration: none;
+    }
+
+    .sbd-shot .s {
+      font-size: 12px;
+      color: #8a94a4;
+      margin-top: 4px;
+    }
+
+    /* CTA */
+    .sbd-cta {
+      background: linear-gradient(135deg, #16224a 0%, #23357e 100%);
+      color: #eef2fb;
+      border-radius: 18px;
+      padding: 38px 28px;
+      text-align: center;
+    }
+
+    .sbd-cta h2 {
+      color: #fff;
+    }
+
+    .sbd-cta p {
+      color: #cfd8ef;
+      max-width: 560px;
+      margin: 0 auto 8px;
+    }
+
+    .sbd-cta .pill {
+      display: inline-block;
+      margin-top: 14px;
+      padding: 11px 22px;
+      border-radius: 999px;
+      background: #ffd86b;
+      color: #3a2c00;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .sbd-cta .pill:hover {
+      background: #ffe38f;
+      color: #3a2c00;
+      text-decoration: none;
+    }
+
+    .sbd-cta .fine {
+      font-size: 12px;
+      color: #aab6d6;
+      margin-top: 14px;
+    }
+
+    .sbd-foot {
+      padding: 26px 0 40px;
+      text-align: center;
+      color: #8a94a4;
+      font-size: 13px;
+    }
+
+    @media (max-width:720px) {
+
+      .sbd-desc .sbd-grid,
+      .sbd-desc .sbd-grid-3,
+      .sbd-desc .sbd-q,
+      .sbd-desc .sbd-shots {
+        grid-template-columns: 1fr;
+      }
+
+      .sbd-desc .sbd-stats {
+        grid-template-columns: 1fr;
+      }
+
+      .sbd-hero h1 {
+        font-size: 27px;
+      }
+    }
+  </style>
+
+  <!-- 1. HERO -->
+  <div class="sbd-hero">
+    <div class="wrap">
+      <img class="logo" src="icon.png" alt="Speak To Your Database" />
+      <h1>Ask Your Odoo a Question. Get an Answer You Can Trust.</h1>
+      <p class="sub">Speak To Your Database lets you ask plain-language questions like “total unpaid invoices,” “sales
+        this month,” or “orders for a customer” — and get answers straight from your live Odoo, each showing its source,
+        a confidence level, and exactly how it was calculated. Read-only and safe by design: no SQL is sent to Odoo, no
+        database credentials are exposed, and nothing in your data is ever changed.</p>
+      <div class="sbd-badges">
+        <span class="sbd-badge">Odoo 19.0</span>
+        <span class="sbd-badge">Read-only</span>
+        <span class="sbd-badge">No SQL</span>
+        <a class="sbd-badge beta" href="https://speaktoyourdatabase.com/?apply=ai_beta" target="_blank" rel="noopener">
+          Request Early Access
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. PROBLEM -->
+  <section>
+    <div class="wrap">
+      <h2>The problem</h2>
+      <p class="sbd-lead">Your Odoo data is one of your most valuable assets — but getting quick answers from it safely
+        is hard.</p>
+      <div class="sbd-grid">
+        <div class="sbd-card">
+          <h3>Reports take time</h3>
+          <p class="muted">Business users constantly need numbers — sales this month, unpaid totals, orders per customer
+            — and end up waiting on custom reports or exports.</p>
+        </div>
+        <div class="sbd-card">
+          <h3>Uncontrolled database access is risky</h3>
+          <p class="muted">Raw database access should not be shared casually with dashboards or AI tools. Without
+            read-only credentials, network restrictions, and query controls, it can expose your ERP to mistakes, leaks,
+            and uncontrolled queries.</p>
+        </div>
+        <div class="sbd-card">
+          <h3>Unrestricted AI over an ERP is risky</h3>
+          <p class="muted">Letting a general AI roam freely across ERP data can surface sensitive fields, invent
+            answers, or trigger changes you never intended.</p>
+        </div>
+        <div class="sbd-card">
+          <h3>AI answers need to be verifiable</h3>
+          <p class="muted">Business users should not have to trust a black-box answer. They need to see where the
+            number came from, what was included, and how it was calculated before acting on it.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. SOLUTION -->
+  <section class="band-alt">
+    <div class="wrap">
+      <h2>The solution</h2>
+      <p class="sbd-lead">The Odoo Bridge is a small, security-focused module that gives <strong>Speak To Your
+          Database</strong> a controlled, read-only path into your Odoo — through the Odoo ORM, never raw SQL.</p>
+      <div class="sbd-grid-3">
+        <div class="sbd-card"><span class="num">1</span>
+          <h3>Install the Bridge</h3>
+          <p class="muted">Add the <code>styd_odoo_bridge</code> module to your self-hosted Odoo 19 and enable it for
+            the connector owner.</p>
+        </div>
+        <div class="sbd-card"><span class="num">2</span>
+          <h3>Connect securely</h3>
+          <p class="muted">Generate a token in Odoo, paste it into Speak To Your Database, and select <strong>Odoo
+              Bridge</strong> as your chat source.</p>
+        </div>
+        <div class="sbd-card"><span class="num">3</span>
+          <h3>Ask &amp; get answers</h3>
+          <p class="muted">Ask a supported question and get a clear answer — each with a source, a confidence level,
+            and a “how this was calculated” breakdown.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3b. WHY IT'S DIFFERENT -->
+  <section>
+    <div class="wrap">
+      <h2>Answers you can verify</h2>
+      <p class="sbd-lead">A general AI can sound confident and still be wrong. Speak To Your Database brings every
+        answer back with the context you need to trust it — while staying inside strict safety boundaries the whole
+        time.</p>
+      <div class="sbd-grid-3">
+        <div class="sbd-card">
+          <h3>Source on every answer</h3>
+          <p class="muted">Each answer names exactly where it came from in your Odoo, so you always know what you are
+            looking at.</p>
+        </div>
+        <div class="sbd-card">
+          <h3>Confidence level</h3>
+          <p class="muted">Every answer carries a confidence level, so a solid number is easy to tell apart from an
+            uncertain one.</p>
+        </div>
+        <div class="sbd-card">
+          <h3>“How this answer was calculated”</h3>
+          <p class="muted">Open a plain-language breakdown of the records and logic behind each answer — no black
+            box.</p>
+        </div>
+      </div>
+      <div class="sbd-answer-meta">
+        <span class="sbd-chip ok">Read-only Odoo Bridge</span>
+        <span class="sbd-chip ok">No SQL sent to Odoo</span>
+        <span class="sbd-chip ok">No writes — nothing changes</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. VERSION SUPPORT -->
+  <section>
+    <div class="wrap">
+      <h2>Version support</h2>
+      <div class="sbd-callout">
+        <p>
+          This Odoo Bridge module is currently validated for <strong>Odoo 19.0</strong>
+          self-hosted and Odoo.sh environments.
+        </p>
+        <p>
+          For <strong>Odoo 15.0, 16.0, 17.0, and 18.0</strong>, the Odoo Bridge module is not available yet. In the
+          meantime, Speak To Your Database can connect through a <strong>secured, read-only database connection</strong>
+          where database access is available. Uncontrolled database access is risky — so this path is meant to be set
+          up carefully, with read-only credentials and proper network restrictions, as a deliberate fallback until the
+          Bridge is validated for each of these Odoo versions.
+        </p>
+
+        <p>
+          Bridge module support for older Odoo versions is planned and will be published after controlled
+          validation for each Odoo series.
+        </p>
+        <p class="muted">
+          Setup guide:
+          <a href="https://speaktoyourdatabase.com/docs#odoo%2Fbridge-module" target="_blank" rel="noopener">
+            speaktoyourdatabase.com/docs#odoo%2Fbridge-module
+          </a>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. EXAMPLE QUESTIONS -->
+  <section class="band-alt">
+    <div class="wrap">
+      <h2>Example questions</h2>
+      <p class="muted">Proven business questions, answered reliably — with more added over time. (Replace <em>Azure
+          Interior</em> with a real customer in your data.)</p>
+      <div class="sbd-q">
+        <div class="item">count customers</div>
+        <div class="item">show products</div>
+        <div class="item">sales orders this month</div>
+        <div class="item">total sales this month</div>
+        <div class="item">total unpaid amount</div>
+        <div class="item">quotations for Azure Interior</div>
+        <div class="item">orders for Azure Interior</div>
+        <div class="item">total sales for Azure Interior</div>
+      </div>
+      <div class="sbd-answer-meta">
+        <span class="sbd-chip src">Source: Odoo Bridge</span>
+        <span class="sbd-chip ok">Confidence: High (0.9)</span>
+        <span class="sbd-chip">Read-only · No SQL</span>
+        <span class="sbd-chip">“How this answer was calculated”</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. SECURITY -->
+  <section>
+    <div class="wrap">
+      <h2>Security by design</h2>
+      <p class="sbd-lead">The Bridge is built so the worst case is simply “an allow-listed business record was read” —
+        never a write, a credential disclosure, or an arbitrary query.</p>
+      <div class="sbd-grid">
+        <ul class="sbd-list">
+          <li><strong>Read-only ORM</strong> access only — list reads, counts, and aggregations.</li>
+          <li><strong>No SQL</strong> is sent from Speak To Your Database to Odoo.</li>
+          <li><strong>No write / create / update / delete</strong> — there is no write path.</li>
+          <li><strong>Allow-listed models</strong> — only a small set of standard business models is readable.</li>
+          <li><strong>Allow-listed fields</strong> — only safe field types are returned or filtered.</li>
+          <li><strong>Sensitive credential / security fields are blocked</strong> from ever being returned.</li>
+        </ul>
+        <ul class="sbd-list">
+          <li><strong>Token shown once</strong> at generation — never displayed again.</li>
+          <li><strong>Hash-at-rest in Odoo</strong> — only a SHA-256 hash of the token is stored.</li>
+          <li><strong>Encrypted server-side</strong> in Speak To Your Database — used server-side only, never in the
+            browser.</li>
+          <li><strong>No database credentials</strong> are ever exposed to Speak To Your Database.</li>
+          <li><strong>Company-scoped access</strong> — results follow the connector owner’s Odoo company scope.</li>
+          <li><strong>Safe fallback</strong> — unsupported questions return a clear “not supported yet” message, never a
+            guess or a SQL fallback.</li>
+        </ul>
+      </div>
+      <p class="sbd-note">Current early access mode: <code>sudo_company_scoped</code> — a company-level boundary.
+        Per-user Odoo record-rule enforcement is <strong>not</strong> applied yet (see “What’s not supported yet”).</p>
+    </div>
+  </section>
+
+  <!-- 7. SUPPORTED MODELS -->
+  <section class="band-alt">
+    <div class="wrap">
+      <h2>Supported Odoo models</h2>
+      <p class="muted">Speak To Your Database is focused on the data behind your everyday revenue, cash, and customer
+        questions. The current bridge reads from a small, deliberate set of standard Odoo business models:</p>
+      <div class="sbd-models">
+        <div class="sbd-model">res.partner <span>· customers / contacts</span></div>
+        <div class="sbd-model">sale.order <span>· sales orders &amp; quotations</span></div>
+        <div class="sbd-model">account.move <span>· invoices / credit notes</span></div>
+        <div class="sbd-model">account.move.line <span>· invoice lines</span></div>
+        <div class="sbd-model">product.template <span>· products</span></div>
+        <div class="sbd-model">product.product <span>· product variants</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. NOT SUPPORTED YET -->
+  <section>
+    <div class="wrap">
+      <h2>What’s not supported yet</h2>
+      <p class="muted">Intentionally out of scope for this controlled early access release:</p>
+      <div class="sbd-grid">
+        <ul class="sbd-list no">
+          <li><strong>Odoo Online</strong> (odoo.com-hosted) — custom server modules can’t be installed there.</li>
+          <li><strong>Odoo Bridge marketplace installation for versions older than 19.0</strong> — planned after
+            controlled validation per Odoo series.</li>
+          <li><strong>Arbitrary custom models</strong> and custom-module discovery.</li>
+          <li><strong>Non-allow-listed models</strong> — anything beyond the six models above.</li>
+          <li><strong>Write / update / delete</strong> actions of any kind.</li>
+        </ul>
+        <ul class="sbd-list no">
+          <li><strong>Unrestricted SQL-style analytics</strong> or free-form query building through the bridge.</li>
+          <li><strong>General-knowledge questions</strong> not answerable from your Odoo data.</li>
+          <li><strong>Bridge module support on older Odoo versions</strong> unless tested through controlled
+            early-access validation.</li>
+          <li><strong>Full per-user record-rule enforcement</strong> — the current bridge is company-scoped
+            (<code>sudo_company_scoped</code>), not per-user ACL/record-rule parity.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. DEMO PROOF -->
+  <section class="band-alt">
+    <div class="wrap">
+      <h2>Validated in a controlled sandbox</h2>
+      <p class="sbd-lead">The deterministic MVP was exercised end-to-end in a controlled Odoo 19 sandbox with module
+        <code>19.0.0.4.0</code>.
+      </p>
+      <div class="sbd-stats">
+        <div class="sbd-stat">
+          <div class="big">Passed</div>
+          <div class="lab">Demo-readiness rehearsal</div>
+        </div>
+        <div class="sbd-stat">
+          <div class="big">24 / 0 / 0</div>
+          <div class="lab">Live bridge eval — PASS / WARN / FAIL</div>
+        </div>
+        <div class="sbd-stat">
+          <div class="big">High (0.9)</div>
+          <div class="lab">Confidence on deterministic answers</div>
+        </div>
+      </div>
+      <p class="sbd-note">These results reflect validation in a controlled Odoo 19 sandbox. They are evidence of current
+        behavior, not a warranty, uptime commitment, or production guarantee.</p>
+    </div>
+  </section>
+
+  <!-- 10. SCREENSHOTS (placeholders) -->
+  <!-- 10. SCREENSHOTS -->
+  <section>
+    <div class="wrap">
+      <h2>Product screenshots</h2>
+      <p class="muted">See the Odoo Bridge setup, connection validation, live Odoo answers, and transparent calculation
+        details.</p>
+      <div class="sbd-shots">
+        <figure class="sbd-shot">
+          <a class="sbd-shot-link" href="images/bridge-connection-setup.png" target="_blank" rel="noopener">
+            <img src="images/bridge-connection-setup.png" alt="Odoo Bridge connection setup in Odoo" />
+            <figcaption class="sbd-shot-caption">
+              <div class="t">Bridge connection setup</div>
+              <div class="s">Enable the bridge, manage the token, and copy the secure setup details from Odoo.</div>
+            </figcaption>
+          </a>
+        </figure>
+
+        <figure class="sbd-shot">
+          <a class="sbd-shot-link" href="images/styd-odoo-bridge-connected.png" target="_blank" rel="noopener">
+            <img src="images/styd-odoo-bridge-connected.png"
+              alt="Speak To Your Database Odoo Bridge connected settings" />
+            <figcaption class="sbd-shot-caption">
+              <div class="t">Odoo Bridge connected in Speak To Your Database</div>
+              <div class="s">Validate the bridge connection and confirm the Odoo version, edition, and bridge status.
+              </div>
+            </figcaption>
+          </a>
+        </figure>
+
+        <figure class="sbd-shot">
+          <a class="sbd-shot-link" href="images/bridge-total-sales-answer.png" target="_blank" rel="noopener">
+            <img src="images/bridge-total-sales-answer.png"
+              alt="Odoo Bridge answer with source confidence and verification" />
+            <figcaption class="sbd-shot-caption">
+              <div class="t">Odoo answer with source and confidence</div>
+              <div class="s">Ask plain-language business questions and see Source: Odoo Bridge, confidence, and
+                verification.</div>
+            </figcaption>
+          </a>
+        </figure>
+
+        <figure class="sbd-shot">
+          <a class="sbd-shot-link" href="images/bridge-how-calculated.png" target="_blank" rel="noopener">
+            <img src="images/bridge-how-calculated.png" alt="How this answer was calculated modal for Odoo Bridge" />
+            <figcaption class="sbd-shot-caption">
+              <div class="t">How this answer was calculated</div>
+              <div class="s">Review the read-only Odoo ORM request, filters, data used, and safety assumptions behind
+                the answer.</div>
+            </figcaption>
+          </a>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER / DISCLAIMER -->
+  <div class="sbd-foot">
+    <div class="wrap">
+      <p>Speak To Your Database — Odoo Bridge · module <code>styd_odoo_bridge</code> · version <code>19.0.0.4.0</code> ·
+        Odoo 19.0 · License LGPL-3</p>
+      <p>Controlled early access software, provided for evaluation on an “as-is” basis. Features, supported questions,
+        and versions may change.</p>
+    </div>
+  </div>
+</section>

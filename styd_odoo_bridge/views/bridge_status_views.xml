@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Read-only "Bridge Status / Trust" page (Odoo 19 form view).
+         No <search> view is defined for this model on purpose, so the Odoo 19
+         search-view rules (no <group>/expand inside search) cannot recur. -->
+    <record id="view_styd_bridge_status_form" model="ir.ui.view">
+        <field name="name">styd.odoo.bridge.status.form</field>
+        <field name="model">styd.odoo.bridge.status</field>
+        <field name="arch" type="xml">
+            <form string="Speak To Your Database — Bridge Status" edit="false">
+                <header>
+                    <button name="action_refresh_status" type="object"
+                            string="Refresh Status" class="btn-primary"/>
+                    <button name="action_open_access_logs" type="object"
+                            string="Open Access Logs" class="btn-secondary"/>
+                    <button name="action_open_connection_setup" type="object"
+                            string="Open Connection Setup" class="btn-secondary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Speak To Your Database &#8212; Bridge Status &amp; Trust</h1>
+                        <p class="text-muted">
+                            Read-only overview of how the Speak To Your Database bridge is
+                            configured for this Odoo database and exactly what it can access.
+                            This page makes no changes, stores no secrets, and runs no AI
+                            inside Odoo.
+                        </p>
+                    </div>
+
+                    <field name="legacy_token_present" invisible="1"/>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not legacy_token_present">
+                        Legacy token storage detected. Rotate the token from
+                        <strong>Connection Setup</strong> to upgrade to hashed-at-rest storage.
+                    </div>
+
+                    <!-- 1. Bridge health -->
+                    <group string="1. Bridge health">
+                        <group>
+                            <field name="bridge_enabled" widget="boolean_toggle"/>
+                            <field name="token_configured" widget="boolean_toggle"/>
+                            <field name="connector_owner_display"/>
+                            <field name="supported_features"/>
+                        </group>
+                        <group>
+                            <field name="bridge_version"/>
+                            <field name="odoo_version"/>
+                            <field name="odoo_series"/>
+                            <field name="odoo_edition"/>
+                            <field name="database_uuid"/>
+                        </group>
+                    </group>
+
+                    <!-- 2. Exposed endpoints -->
+                    <separator string="2. Exposed endpoints"/>
+                    <p class="text-muted">
+                        All endpoints are read-only HTTP GET routes and require a valid
+                        bearer token (the Speak To Your Database bridge token). A disabled bridge, or a
+                        missing or invalid token, is rejected and recorded in the access log.
+                    </p>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Endpoint</th>
+                                <th>Method</th>
+                                <th>Description</th>
+                                <th>Bearer token</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>/styd_bridge/v1/health</code></td>
+                                <td>GET</td>
+                                <td>Liveness check plus bridge / Odoo metadata (version, series, edition).</td>
+                                <td>Required</td>
+                            </tr>
+                            <tr>
+                                <td><code>/styd_bridge/v1/security/snapshot</code></td>
+                                <td>GET</td>
+                                <td>Security scope snapshot for the configured connector owner.</td>
+                                <td>Required</td>
+                            </tr>
+                            <tr>
+                                <td><code>/styd_bridge/v1/users/directory</code></td>
+                                <td>GET</td>
+                                <td>Directory of active Odoo users with a rights summary.</td>
+                                <td>Required</td>
+                            </tr>
+                            <tr>
+                                <td><code>/styd_bridge/v1/users/search</code></td>
+                                <td>GET</td>
+                                <td>Filtered user lookup by login, name, or email.</td>
+                                <td>Required</td>
+                            </tr>
+                            <tr>
+                                <td><code>/styd_bridge/v1/capabilities</code></td>
+                                <td>GET</td>
+                                <td>Installed business modules, exposed models, fields, and relations.</td>
+                                <td>Required</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- 3. Read-only scope / permissions -->
+                    <separator string="3. Read-only scope / permissions"/>
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <p><strong>What the bridge can read today:</strong></p>
+                            <ul>
+                                <li>Security snapshot (connector-owner scope and access flags)</li>
+                                <li>Odoo user directory (active users + rights summary)</li>
+                                <li>User search (login / name / email)</li>
+                                <li>Capability snapshot (modules, models, fields, relations)</li>
+                                <li>Health metadata (versions, edition, database UUID)</li>
+                            </ul>
+                        </div>
+                        <div class="col-lg-6">
+                            <p><strong>What the bridge does NOT do:</strong></p>
+                            <ul>
+                                <li>It never creates, updates, or deletes business records.</li>
+                                <li>It does not run any AI inside Odoo.</li>
+                                <li>It does not send prompts from Odoo.</li>
+                                <li>External Speak To Your Database usage / metering is handled outside this module.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- 4. Audit summary -->
+                    <group string="4. Audit summary">
+                        <group>
+                            <field name="audit_last_access"/>
+                            <field name="audit_total_count"/>
+                        </group>
+                        <group>
+                            <field name="audit_granted_count"/>
+                            <field name="audit_denied_count"/>
+                            <field name="audit_error_count"/>
+                        </group>
+                    </group>
+                    <div class="mt-2">
+                        <button name="action_open_access_logs" type="object"
+                                string="Open Access Logs" class="btn-link"/>
+                    </div>
+
+                    <!-- 5. Security guidance -->
+                    <separator string="5. Security guidance"/>
+                    <ul>
+                        <li>Keep the bridge token secret; treat it like a password.</li>
+                        <li>Rotate the token immediately if it may have been exposed.</li>
+                        <li>Disable the bridge when it is not in use.</li>
+                        <li>Review the access logs after any configuration change.</li>
+                        <li>Restrict Odoo server exposure with a reverse proxy / firewall as appropriate.</li>
+                    </ul>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action: open the read-only status page. -->
+    <record id="action_styd_bridge_status" model="ir.actions.act_window">
+        <field name="name">Bridge Status</field>
+        <field name="res_model">styd.odoo.bridge.status</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_styd_bridge_status_form"/>
+        <field name="target">current</field>
+        <field name="context">{}</field>
+    </record>
+
+    <!-- Menu: Bridge Status under the existing Speak To Your Database root, shown first. -->
+    <menuitem id="menu_styd_bridge_status"
+              name="Bridge Status"
+              parent="menu_styd_bridge_root"
+              action="action_styd_bridge_status"
+              groups="base.group_system"
+              sequence="5"/>
+</odoo>

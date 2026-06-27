@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_styd_bridge" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.styd.bridge</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app
+                    string="Speak To Your Database"
+                     name="styd_odoo_bridge"
+                     logo="/styd_odoo_bridge/static/description/icon.png">
+                    <block title="Speak To Your Database Bridge" name="styd_bridge_block">
+                        <setting
+                            string="Enable Speak To Your Database Bridge"
+                            help="Enable the Speak To Your Database security bridge endpoints for this Odoo database."
+                            id="styd_bridge_enabled_setting"
+                        >
+                            <field name="styd_bridge_enabled"/>
+                        </setting>
+
+                        <setting
+                            string="Speak To Your Database Bridge Token"
+                            help="The bridge token is generated and rotated from Speak To Your Database Bridge &gt; Connection Setup. It is stored only as a hash and is never shown here."
+                            id="styd_bridge_token_setting"
+                        >
+                            <field name="styd_bridge_token_configured" widget="boolean_toggle" readonly="1"/>
+                            <div class="text-muted">
+                                Generate, rotate, or revoke the token from
+                                <strong>Speak To Your Database Bridge &gt; Connection Setup</strong>.
+                            </div>
+                        </setting>
+
+                        <setting
+                            string="Speak To Your Database Connector Owner"
+                            help="Odoo user whose trusted security scope will be used as the initial connector-owner snapshot."
+                            id="styd_bridge_connector_owner_setting"
+                        >
+                            <field
+                                name="styd_bridge_connector_owner_user_id"
+                                options="{'no_create': True}"
+                            />
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>
