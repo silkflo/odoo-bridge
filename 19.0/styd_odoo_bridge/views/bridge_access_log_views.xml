@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List view (Odoo 19 uses <list>, not <tree>). Read-only: no create/edit/delete. -->
+    <record id="view_styd_bridge_access_log_list" model="ir.ui.view">
+        <field name="name">styd.odoo.bridge.access.log.list</field>
+        <field name="model">styd.odoo.bridge.access.log</field>
+        <field name="arch" type="xml">
+            <list string="Speak To Your Database Bridge Access Log" create="false" edit="false" delete="false">
+                <field name="create_date" string="Logged On (UTC stored)"/>
+                <field name="endpoint"/>
+                <field name="method"/>
+                <field name="outcome"
+                       decoration-success="outcome == 'granted'"
+                       decoration-warning="outcome == 'denied'"
+                       decoration-danger="outcome == 'error'"
+                       widget="badge"/>
+                <field name="reason_code"/>
+                <field name="http_status"/>
+                <field name="source_ip"/>
+                <field name="token_fingerprint" optional="show"/>
+                <field name="detail" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form view. Read-only. -->
+    <record id="view_styd_bridge_access_log_form" model="ir.ui.view">
+        <field name="name">styd.odoo.bridge.access.log.form</field>
+        <field name="model">styd.odoo.bridge.access.log</field>
+        <field name="arch" type="xml">
+            <form string="Speak To Your Database Bridge Access Log" create="false" edit="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="create_date" string="Logged On (UTC stored)"/>
+                            <field name="endpoint"/>
+                            <field name="method"/>
+                            <field name="outcome"/>
+                        </group>
+                        <group>
+                            <field name="reason_code"/>
+                            <field name="http_status"/>
+                            <field name="source_ip"/>
+                            <field name="token_fingerprint"/>
+                        </group>
+                    </group>
+                    <group string="Detail">
+                        <field name="detail" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search view. -->
+    <record id="view_styd_bridge_access_log_search" model="ir.ui.view">
+        <field name="name">styd.odoo.bridge.access.log.search</field>
+        <field name="model">styd.odoo.bridge.access.log</field>
+        <field name="arch" type="xml">
+            <search string="Search Speak To Your Database Bridge Access Logs">
+                <field name="endpoint"/>
+                <field name="method"/>
+                <field name="outcome"/>
+                <field name="reason_code"/>
+                <field name="http_status"/>
+                <field name="source_ip"/>
+
+                <filter string="Granted" name="filter_granted" domain="[('outcome', '=', 'granted')]"/>
+                <filter string="Denied" name="filter_denied" domain="[('outcome', '=', 'denied')]"/>
+                <filter string="Error" name="filter_error" domain="[('outcome', '=', 'error')]"/>
+
+                <separator/>
+
+                <filter string="Today" name="filter_today"
+                        domain="[('create_date', '>=', datetime.datetime.combine(context_today(), datetime.time(0,0,0)))]"/>
+
+                <separator/>
+
+                <filter string="Group by Endpoint" name="group_endpoint"
+                        context="{'group_by': 'endpoint'}"/>
+                <filter string="Group by Outcome" name="group_outcome"
+                        context="{'group_by': 'outcome'}"/>
+                <filter string="Group by Reason Code" name="group_reason_code"
+                        context="{'group_by': 'reason_code'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action. -->
+    <record id="action_styd_bridge_access_log" model="ir.actions.act_window">
+        <field name="name">Access Logs</field>
+        <field name="res_model">styd.odoo.bridge.access.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_styd_bridge_access_log_search"/>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No bridge access has been recorded yet.
+            </p>
+            <p>
+                Every call to a Speak To Your Database bridge endpoint is logged here:
+                granted requests, denied requests (disabled bridge, missing or
+                invalid token), and internal errors. The raw token is never stored.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menus (admin only). Top-level "Speak To Your Database" app menu + Access Logs child. -->
+    <menuitem id="menu_styd_bridge_root"
+              name="Speak To Your Database"
+              web_icon="styd_odoo_bridge,static/description/icon.png"
+              groups="base.group_system"
+              sequence="100"/>
+
+    <menuitem id="menu_styd_bridge_access_log"
+              name="Access Logs"
+              parent="menu_styd_bridge_root"
+              action="action_styd_bridge_access_log"
+              groups="base.group_system"
+              sequence="10"/>
+</odoo>
