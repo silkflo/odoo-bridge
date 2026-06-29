@@ -5,7 +5,7 @@ from odoo import models, release
 
 class StydOdooBridgeService(models.AbstractModel):
     _name = "styd.odoo.bridge.service"
-    _description = "STYD Odoo Bridge Service"
+    _description = "Speak To Your Database Bridge Service"
 
     BRIDGE_VERSION = "0.2.0"
 

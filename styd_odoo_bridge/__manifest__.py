@@ -1,9 +1,10 @@
 {
-    "name": "STYD Odoo Bridge",
-    "version": "15.0.0.1.0",
-    "summary": "Trusted Odoo security bridge for Speak to your Database",
+    "name": "Speak To Your Database — Secure Odoo AI Connector",
+    "version": "15.0.0.7.0",
+    "summary": "Secure read-only connector for Speak To Your Database.",
     "category": "Tools",
-    "author": "Speak to your Database",
+    "author": "Speak To Your Database",
+    "website": "https://speaktoyourdatabase.com",
     "license": "LGPL-3",
     "depends": ["base", "base_setup"],
     "data": [
