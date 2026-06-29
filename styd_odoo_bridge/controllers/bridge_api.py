@@ -45,7 +45,7 @@ class StydBridgeApi(http.Controller):
                 "ok": False,
                 "response": self._error_response(
                     "bridge_disabled",
-                    "STYD bridge is disabled in Odoo settings.",
+                    "Speak To Your Database bridge is disabled in Odoo settings.",
                     status=403,
                 ),
             }
