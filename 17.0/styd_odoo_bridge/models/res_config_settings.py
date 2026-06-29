@@ -5,18 +5,18 @@ class ResConfigSettings(models.TransientModel):
     _inherit = "res.config.settings"
 
     styd_bridge_enabled = fields.Boolean(
-        string="Enable STYD Bridge",
-        help="Enable the STYD security bridge endpoints for this Odoo database.",
+        string="Enable Speak To Your Database Bridge",
+        help="Enable the Speak To Your Database security bridge endpoints for this Odoo database.",
     )
 
     styd_bridge_token = fields.Char(
-        string="STYD Bridge Token",
-        help="Bearer token used by Speak to your Database to authenticate to the Odoo bridge.",
+        string="Speak To Your Database Bridge Token",
+        help="Bearer token used by Speak To Your Database to authenticate to the Odoo bridge.",
     )
 
     styd_bridge_connector_owner_user_id = fields.Many2one(
         comodel_name="res.users",
-        string="STYD Connector Owner",
+        string="Speak To Your Database Connector Owner",
         help="Odoo user whose trusted security scope will be used as the initial connector-owner snapshot.",
     )
 

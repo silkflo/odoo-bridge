@@ -5,7 +5,7 @@
 > the Odoo marketplace, and it should **not** be treated as production‑ready. Please
 > read the [Beta disclaimer](#beta-disclaimer) before installing.
 
-Validated module version: **`19.0.0.4.0`** · Odoo series: **19.0** · Mode: **read‑only**
+Validated module version: **`19.0.0.7.0`** · Odoo series: **19.0** · Mode: **read‑only**
 
 ---
 
@@ -39,7 +39,7 @@ engine, not a write channel, and not a replacement for Odoo reporting.
 - **Controlled private beta.** Functionality is intentionally limited to a
   deterministic, allow‑listed question set (see
   [Supported questions](SUPPORTED-QUESTIONS.md)).
-- Validated in controlled testing on Odoo 19 with module `19.0.0.4.0`:
+- Validated in controlled testing on Odoo 19 with module `19.0.0.7.0`:
   - read‑only bridge evaluation: **24 checks passed, 0 warnings, 0 failures**;
   - demo‑readiness rehearsal: **all demo prompts pass** (Source: Odoo Bridge, high
     confidence, no SQL, no credential exposure).
@@ -49,7 +49,7 @@ engine, not a write channel, and not a replacement for Odoo reporting.
 ## Supported Odoo version
 
 - **Validated for this beta:** Odoo **19.0**, module folder `19.0/styd_odoo_bridge`,
-  version **`19.0.0.4.0`**.
+  version **`19.0.0.7.0`**.
 - The repository also contains module folders for Odoo 15.0–18.0, but **only 19.0 is
   part of this validated private‑beta package.** Use another series only if Speak To
   Your Database support explicitly asks you to.
@@ -144,7 +144,7 @@ token and Settings steps.
   invitation** you received, or contact the Speak To Your Database representative who
   provisioned your access.
 - When reporting an issue, please include: Odoo series + module version
-  (`19.0.0.4.0`), the exact question you asked, the **Source** label shown, and a
+  (`19.0.0.7.0`), the exact question you asked, the **Source** label shown, and a
   screenshot of **Bridge Status**. **Never** include the raw token in a report.
 - Support email: `<your-private-beta-contact-email>` *(provided with your invite)*.
 

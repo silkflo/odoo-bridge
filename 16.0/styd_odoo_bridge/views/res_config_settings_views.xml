@@ -11,7 +11,7 @@
                      string="Speak To Your Database"
                      data-key="styd_odoo_bridge">
 
-                    <h2>STYD Bridge</h2>
+                    <h2>Speak To Your Database Bridge</h2>
 
                     <div class="row mt16 o_settings_container">
                         <div class="col-12 col-lg-6 o_setting_box">
@@ -21,7 +21,7 @@
                             <div class="o_setting_right_pane">
                                 <label for="styd_bridge_enabled"/>
                                 <div class="text-muted">
-                                    Enable the STYD security bridge endpoints for this Odoo database.
+                                    Enable the Speak To Your Database security bridge endpoints for this Odoo database.
                                 </div>
                             </div>
                         </div>
@@ -36,7 +36,7 @@
                                 <field
                                     name="styd_bridge_token"
                                     password="True"
-                                    placeholder="Paste the STYD bridge token"
+                                    placeholder="Paste the Speak To Your Database bridge token"
                                 />
                             </div>
                         </div>
@@ -61,7 +61,7 @@
     </record>
 
     <record id="action_styd_bridge_settings" model="ir.actions.act_window">
-        <field name="name">STYD Bridge</field>
+        <field name="name">Speak To Your Database Bridge</field>
         <field name="res_model">res.config.settings</field>
         <field name="view_mode">form</field>
         <field name="target">inline</field>
@@ -70,7 +70,7 @@
 
     <menuitem
         id="menu_styd_bridge_settings"
-        name="STYD Bridge"
+        name="Speak To Your Database Bridge"
         parent="base.menu_administration"
         action="action_styd_bridge_settings"
         sequence="5"

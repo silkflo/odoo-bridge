@@ -1,4 +1,4 @@
-# STYD Odoo Bridge — Post-Install Checklist
+# Speak To Your Database Odoo Bridge — Post-Install Checklist
 
 ## Module installation
 
@@ -9,11 +9,11 @@
 ## Settings UI
 
 - [ ] the Settings page loads without Owl/UI errors
-- [ ] the STYD logo/icon displays correctly
-- [ ] the STYD Bridge section is visible
-- [ ] the **Enable STYD Bridge** option is visible
-- [ ] the **STYD Bridge Token** field is visible
-- [ ] the **STYD Connector Owner** field is visible
+- [ ] the Speak To Your Database logo/icon displays correctly
+- [ ] the Speak To Your Database Bridge section is visible
+- [ ] the **Enable Speak To Your Database Bridge** option is visible
+- [ ] the **Speak To Your Database Bridge Token** field is visible
+- [ ] the **Speak To Your Database Connector Owner** field is visible
 
 ## Configuration
 
@@ -37,7 +37,7 @@
 - [ ] model access snapshot is present
 - [ ] security flags are present
 
-## Speak to your Database integration
+## Speak To Your Database integration
 
 - [ ] the Odoo base URL is entered in the workspace Odoo settings
 - [ ] the bridge token matches the token saved in Odoo

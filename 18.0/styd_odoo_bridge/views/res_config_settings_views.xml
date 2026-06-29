@@ -10,29 +10,29 @@
                     string="Speak To Your Database"
                      name="styd_odoo_bridge"
                      logo="/styd_odoo_bridge/static/description/icon.png">
-                    <block title="STYD Bridge" name="styd_bridge_block">
+                    <block title="Speak To Your Database Bridge" name="styd_bridge_block">
                         <setting
-                            string="Enable STYD Bridge"
-                            help="Enable the STYD security bridge endpoints for this Odoo database."
+                            string="Enable Speak To Your Database Bridge"
+                            help="Enable the Speak To Your Database security bridge endpoints for this Odoo database."
                             id="styd_bridge_enabled_setting"
                         >
                             <field name="styd_bridge_enabled"/>
                         </setting>
 
                         <setting
-                            string="STYD Bridge Token"
-                            help="Bearer token used by Speak to your Database to authenticate to the Odoo bridge."
+                            string="Speak To Your Database Bridge Token"
+                            help="Bearer token used by Speak To Your Database to authenticate to the Odoo bridge."
                             id="styd_bridge_token_setting"
                         >
                             <field
                                 name="styd_bridge_token"
                                 password="True"
-                                placeholder="Paste the STYD bridge token"
+                                placeholder="Paste the Speak To Your Database bridge token"
                             />
                         </setting>
 
                         <setting
-                            string="STYD Connector Owner"
+                            string="Speak To Your Database Connector Owner"
                             help="Odoo user whose trusted security scope will be used as the initial connector-owner snapshot."
                             id="styd_bridge_connector_owner_setting"
                         >

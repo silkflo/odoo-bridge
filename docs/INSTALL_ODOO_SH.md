@@ -1,4 +1,4 @@
-# STYD Odoo Bridge — Odoo.sh Installation Guide
+# Speak To Your Database Odoo Bridge — Odoo.sh Installation Guide
 
 ## Overview
 
@@ -13,7 +13,7 @@ Odoo.sh is best handled through Git-based deployment:
 5. Enable the bridge in Odoo Settings.
 6. Save the settings.
 7. Test the bridge endpoints.
-8. Sync the bridge from STYD.
+8. Sync the bridge from Speak To Your Database.
 
 ---
 
@@ -36,7 +36,7 @@ If your Odoo.sh project runs Odoo 18.0, use:
 18.0/styd_odoo_bridge
 ```
 
-Do **not** install the wrong version folder unless instructed by STYD support.
+Do **not** install the wrong version folder unless instructed by Speak To Your Database support.
 
 ---
 
@@ -51,7 +51,7 @@ styd_odoo_bridge
 Display name in Odoo:
 
 ```text
-STYD Odoo Bridge
+Speak To Your Database Odoo Bridge
 ```
 
 ---
@@ -114,7 +114,7 @@ Example:
 
 ```bash
 git add .
-git commit -m "Add STYD Odoo Bridge module"
+git commit -m "Add Speak To Your Database Odoo Bridge module"
 git push origin YOUR_BRANCH
 ```
 
@@ -177,13 +177,13 @@ This step is required after adding a new module to the repository.
 Search for:
 
 ```text
-STYD
+Speak To Your Database
 ```
 
 or:
 
 ```text
-STYD Odoo Bridge
+Speak To Your Database Odoo Bridge
 ```
 
 or:
@@ -199,14 +199,14 @@ If the module is not visible:
 - confirm that the module was deployed in the Odoo.sh branch
 - confirm that the module folder is named exactly `styd_odoo_bridge`
 - update the Apps List again
-- refresh the page and search `STYD`
+- refresh the page and search `Speak To Your Database`
 
 ### 4.5 Activate / install the module
 
 Open:
 
 ```text
-STYD Odoo Bridge
+Speak To Your Database Odoo Bridge
 ```
 
 Click:
@@ -239,12 +239,12 @@ Go to:
 Settings
 ```
 
-### 5.2 Search for STYD
+### 5.2 Search for Speak To Your Database
 
 In the Settings search bar, search:
 
 ```text
-STYD
+Speak To Your Database
 ```
 
 You should see a section named:
@@ -256,7 +256,7 @@ Speak To Your Database
 or:
 
 ```text
-STYD Bridge
+Speak To Your Database Bridge
 ```
 
 ### 5.3 Enable the bridge
@@ -264,7 +264,7 @@ STYD Bridge
 Check:
 
 ```text
-Enable STYD Bridge
+Enable Speak To Your Database Bridge
 ```
 
 ### 5.4 Enter the bridge token
@@ -279,13 +279,13 @@ styd-bridge-7f92c1b9-very-secret
 
 Use a long random value in production.
 
-You must use the exact same token later in STYD.
+You must use the exact same token later in Speak To Your Database.
 
 ### 5.5 Choose the connector owner
 
 Select the Odoo user whose trusted security scope will be used as the initial connector-owner snapshot.
 
-Usually this should be an Odoo administrator or the Odoo user responsible for connecting STYD.
+Usually this should be an Odoo administrator or the Odoo user responsible for connecting Speak To Your Database.
 
 ### 5.6 Save the settings
 
@@ -297,13 +297,13 @@ Save
 
 This step is required.
 
-If you do not click **Save**, the bridge will remain disabled and STYD will receive:
+If you do not click **Save**, the bridge will remain disabled and Speak To Your Database will receive:
 
 ```json
 {
   "ok": false,
   "error": "bridge_disabled",
-  "detail": "STYD bridge is disabled in Odoo settings."
+  "detail": "Speak To Your Database bridge is disabled in Odoo settings."
 }
 ```
 
@@ -406,16 +406,16 @@ Expected response includes:
 
 ---
 
-## 9. Connect from STYD
+## 9. Connect from Speak To Your Database
 
-In the **workspace Odoo settings** in STYD:
+In the **workspace Odoo settings** in Speak To Your Database:
 
 1. Enter the Odoo base URL.
 2. Enter the same bridge token you saved in Odoo Settings.
 3. Enter the Odoo database name if required.
 4. Run **Sync bridge**.
 
-After sync, STYD should display:
+After sync, Speak To Your Database should display:
 
 - bridge status
 - connector owner
@@ -438,7 +438,7 @@ When the bridge module code changes:
 In Odoo:
 
 ```text
-Apps → STYD Odoo Bridge → Upgrade
+Apps → Speak To Your Database Odoo Bridge → Upgrade
 ```
 
 Then verify:
@@ -461,7 +461,7 @@ Check:
 4. Did you enable developer mode?
 5. Did you click **Update Apps List**?
 6. Did you remove filters such as `Official Apps`?
-7. Did you search for `STYD`?
+7. Did you search for `Speak To Your Database`?
 
 ### The bridge endpoint returns `bridge_disabled`
 
@@ -470,8 +470,8 @@ The module is installed, but the bridge was not enabled in Odoo Settings.
 Fix:
 
 1. Go to **Settings**.
-2. Search `STYD`.
-3. Check **Enable STYD Bridge**.
+2. Search `Speak To Your Database`.
+3. Check **Enable Speak To Your Database Bridge**.
 4. Enter the token.
 5. Choose the connector owner.
 6. Click **Save**.
@@ -508,8 +508,8 @@ This is especially important on multi-database Odoo.sh deployments.
 - Use a strong bridge token.
 - Store the token securely.
 - The bridge exposes security and metadata context, not uncontrolled raw business data.
-- Effective STYD access is:
+- Effective Speak To Your Database access is:
 
 ```text
-trusted Odoo scope ∩ STYD workspace restrictions
+trusted Odoo scope ∩ Speak To Your Database workspace restrictions
 ```

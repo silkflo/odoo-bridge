@@ -2,7 +2,7 @@
 
 This guide installs the **Speak To Your Database Bridge** module on a self‑hosted
 Odoo 19 server and connects it to Speak To Your Database. It covers a controlled
-private‑beta build (module **`19.0.0.4.0`**). Please read [SECURITY.md](SECURITY.md)
+private‑beta build (module **`19.0.0.7.0`**). Please read [SECURITY.md](SECURITY.md)
 before going live.
 
 > The Bridge is **read‑only**. Installing it does not allow Speak To Your Database to
@@ -27,7 +27,7 @@ before going live.
 Use the module folder that matches your Odoo series. For this beta:
 
 ```text
-19.0/styd_odoo_bridge        ← validated, version 19.0.0.4.0  (use this)
+19.0/styd_odoo_bridge        ← validated, version 19.0.0.7.0  (use this)
 ```
 
 Folders for 15.0–18.0 exist in the repository but are **not** part of this validated
@@ -97,7 +97,7 @@ sudo systemctl restart odoo        # or: docker restart <odoo_container>
   Install**.
 - **Upgrading a beta build:** copy the new `19.0/styd_odoo_bridge` over the old one,
   restart Odoo, **Update Apps List**, then on the module click **Upgrade**. Confirm
-  the version reads **`19.0.0.4.0`** (Apps → module → technical info).
+  the version reads **`19.0.0.7.0`** (Apps → module → technical info).
 
 ```bash
 # Optional CLI upgrade (self-hosted)
@@ -184,7 +184,7 @@ yet” message (still labelled Odoo Bridge).
 
 ### Quick verification checklist
 
-- [ ] Module shows version `19.0.0.4.0` in Apps.
+- [ ] Module shows version `19.0.0.7.0` in Apps.
 - [ ] `…/styd_bridge/v1/health` returns `{"ok": true}`.
 - [ ] Bridge **enabled** and **saved** in Settings; connector owner set.
 - [ ] Token generated, copied once, pasted into Speak To Your Database, synced.

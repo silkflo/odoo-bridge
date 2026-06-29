@@ -1,10 +1,10 @@
-# STYD Odoo Bridge — Self-Hosted Installation Guide
+# Speak To Your Database Odoo Bridge — Self-Hosted Installation Guide
 
 ## Overview
 
 This guide explains how to install the `styd_odoo_bridge` module on a self-hosted Odoo instance.
 
-This module enables a trusted security bridge between Odoo and Speak to your Database.
+This module enables a trusted security bridge between Odoo and Speak To Your Database.
 
 ## Supported environments
 
@@ -211,7 +211,7 @@ sudo systemctl status odoo.service --no-pager
 1. Enable developer mode
 2. Open **Apps**
 3. Click **Update Apps List**
-4. Search for `STYD Odoo Bridge` or `styd_odoo_bridge`
+4. Search for `Speak To Your Database Odoo Bridge` or `styd_odoo_bridge`
 5. Click **Activate**
 
 ### Option B — CLI
@@ -225,27 +225,27 @@ Replace `YOUR_DATABASE` with the target Odoo database name.
 
 ## 6. Configure the module in Odoo
 
-Open **Settings** and search for `STYD`.
+Open **Settings** and search for `Speak To Your Database`.
 
 Configure:
 
-- **Enable STYD Bridge**
-- **STYD Bridge Token**
-- **STYD Connector Owner**
+- **Enable Speak To Your Database Bridge**
+- **Speak To Your Database Bridge Token**
+- **Speak To Your Database Connector Owner**
 
 Notes:
 
-- **Enable STYD Bridge**
+- **Enable Speak To Your Database Bridge**
   - turn this on to allow the bridge endpoints to respond
 
-- **STYD Bridge Token**
+- **Speak To Your Database Bridge Token**
   - enter any secret string you choose
   - use a long random value
   - example:
     - `styd-bridge-7f92c1b9-very-secret`
-  - you must use the exact same token later in Speak to your Database
+  - you must use the exact same token later in Speak To Your Database
 
-- **STYD Connector Owner**
+- **Speak To Your Database Connector Owner**
   - choose the Odoo user whose trusted scope will be used for the connector-owner snapshot
 
 Then save.
@@ -281,9 +281,9 @@ Expected result:
 - model access
 - security flags
 
-## 9. Connect from Speak to your Database
+## 9. Connect from Speak To Your Database
 
-In the **workspace Odoo settings** in Speak to your Database:
+In the **workspace Odoo settings** in Speak To Your Database:
 
 - enter the Odoo base URL
 - enter the same bridge token you saved in Odoo

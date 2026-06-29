@@ -134,7 +134,15 @@ For a manual bridge installation, the installation has four main steps:
 3. Restart Odoo, then install or activate the bridge from the Odoo Apps screen.
 4. Open the connection setup in Odoo, enable the bridge, choose the connector owner, generate a token, and save.
 
-For Odoo 19.0 marketplace users, the marketplace installation replaces the manual copy step.
+For Odoo 19.0 marketplace users, the marketplace installation replaces the manual copy step. The Odoo Apps marketplace provides the module **package**; an Odoo administrator still installs it like any other third-party module (there is no one-click marketplace install).
+
+### Detailed guides
+
+Step-by-step guides are available in the [`docs/`](docs) folder:
+
+* Self-hosted Odoo — [`docs/INSTALL_SELF_HOSTED.md`](docs/INSTALL_SELF_HOSTED.md)
+* Odoo.sh — [`docs/INSTALL_ODOO_SH.md`](docs/INSTALL_ODOO_SH.md)
+* Post-install checklist — [`docs/POST_INSTALL_CHECKLIST.md`](docs/POST_INSTALL_CHECKLIST.md)
 
 ---
 
@@ -415,7 +423,7 @@ If the bridge is not enabled and saved, Speak To Your Database may receive:
 {
   "ok": false,
   "error": "bridge_disabled",
-  "detail": "STYD bridge is disabled in Odoo settings."
+  "detail": "Speak To Your Database bridge is disabled in Odoo settings."
 }
 ```
 
@@ -528,6 +536,8 @@ The bridge exposes the following read-only endpoints:
 /styd_bridge/v1/search-read
 /styd_bridge/v1/read-group
 ```
+
+The `/models`, `/models/<model>/fields`, `/search-read`, and `/read-group` endpoints are provided by the **Odoo 19.0** bridge. The Odoo 15.0–18.0 bridges expose the health, security snapshot, user directory, user search, and capabilities endpoints.
 
 Every endpoint requires a valid bridge token sent as:
 
@@ -726,6 +736,7 @@ If you are unsure about your hosting, contact us.
 * Odoo 15.0–18.0 bridge folders are available for beta testers and early adopters, but are not marketplace-validated yet.
 * The current beta is company-scoped through the connector owner. Per-user record-rule parity is not guaranteed yet.
 * The bridge is read-only: it uses the Odoo ORM, sends no SQL to Odoo, and never writes, creates, updates, or deletes records.
+* The Odoo 19.0 bridge records a read-only access log (audit trail) of bridge requests in Odoo, storing only a non-reversible token fingerprint — never the raw token or business data.
 * Direct database fallback is acceptable only when it is secured and read-only, with a dedicated read-only database user and restricted network access.
 * Direct database fallback does not reproduce exact Odoo per-user permissions.
 * Use a strong bridge token, store it securely, and use HTTPS in production.

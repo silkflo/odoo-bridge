@@ -15,7 +15,7 @@ Record actual values in the “Result” column for each release.*
 | Item | Expected | Result |
 |---|---|---|
 | Odoo series | 19.0 | ☐ |
-| Odoo Bridge module version (`__manifest__.py`) | `19.0.0.4.0` | ☐ |
+| Odoo Bridge module version (`__manifest__.py`) | `19.0.0.7.0` | ☐ |
 | STYD API / app release (deployed) | `<release / commit>` | ☐ |
 | Bridge repo | `silkflo/odoo-bridge-v2` @ `main` | ☐ |
 | STYD app repo | `silkflo/universal-db-ai` @ `main` | ☐ |

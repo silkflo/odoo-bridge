@@ -1,7 +1,7 @@
 # Odoo Bridge — Security Note (Private Beta)
 
 This note describes the security model of the **Speak To Your Database Bridge**
-module as validated for the private beta (module **`19.0.0.4.0`**, Odoo 19). It is
+module as validated for the private beta (module **`19.0.0.7.0`**, Odoo 19). It is
 written to be honest about both the protections in place **and** the current
 boundaries. Please read it before connecting the Bridge to live data.
 
