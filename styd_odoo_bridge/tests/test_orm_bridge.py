@@ -6,26 +6,39 @@ from odoo.addons.styd_odoo_bridge.models.bridge_orm import StydOrmError
 
 @tagged("post_install", "-at_install")
 class TestStydOrmBridge(TransactionCase):
-    """Unit tests for the read-only ORM bridge validators (Phase 5B).
+    """Unit tests for the read-only ORM bridge validators.
 
     These exercise the service-layer logic directly (no HTTP), so they run in
-    the module's test DB which only has `base`. res.partner is therefore the
-    only allowlisted model present; sale.order / account.move queries are
-    covered by the manual curl checks against the sandbox.
+    the module's test DB which only has `base`. The allowlisted models that are
+    actually installed there are the base ones (res.partner, res.users,
+    res.company); the optional-app models (sale.order, account.move,
+    mrp.production, ...) are allowlisted but NOT installed, which lets us assert
+    graceful degradation here and leaves full end-to-end coverage to the live
+    STYD evals / manual curl checks against a fully-featured sandbox.
     """
 
     def setUp(self):
         super().setUp()
         self.orm = self.env["styd.odoo.bridge.orm"]
 
-    # 1. /models returns only allowlisted models
+    # 1. /models returns only allowlisted models that are actually installed
     def test_01_list_models_allowlist_only(self):
         models = self.orm.orm_list_models()
         names = {m["model"] for m in models}
+        # Never lists anything outside the allowlist...
         self.assertTrue(names.issubset(self.orm.MODEL_ALLOWLIST))
-        self.assertNotIn("res.users", names)
+        # ...and never lists an explicitly-excluded sensitive model.
         self.assertNotIn("ir.config_parameter", names)
+        self.assertNotIn("res.groups", names)
+        self.assertNotIn("ir.model.access", names)
+        # base-only models that ARE allowlisted and installed appear.
         self.assertIn("res.partner", names)
+        self.assertIn("res.users", names)
+        self.assertIn("res.company", names)
+        # Optional-app models that are NOT installed in the base-only test DB are
+        # silently skipped (graceful), so they must not appear in the listing.
+        self.assertNotIn("sale.order", names)
+        self.assertNotIn("mrp.production", names)
         for m in models:
             self.assertTrue(m["allowed"])
             self.assertIn("label", m)
@@ -57,14 +70,20 @@ class TestStydOrmBridge(TransactionCase):
             for bad in self.orm.FORBIDDEN_FIELD_SUBSTRINGS:
                 self.assertNotIn(bad, low)
 
-    # 4. blocked model returns model_not_allowed
+    # 4. blocked (non-allowlisted, sensitive) models return model_not_allowed.
+    #    These models DO exist in a base-only DB, so this proves the allowlist --
+    #    not mere absence -- is what blocks them.
     def test_04_blocked_model(self):
-        with self.assertRaises(StydOrmError) as cm:
-            self.orm.orm_model_fields("res.users")
-        self.assertEqual(cm.exception.code, "model_not_allowed")
+        for blocked in ("ir.config_parameter", "res.groups", "ir.model.access"):
+            with self.assertRaises(StydOrmError) as cm:
+                self.orm.orm_model_fields(blocked)
+            self.assertEqual(cm.exception.code, "model_not_allowed")
         with self.assertRaises(StydOrmError) as cm2:
             self.orm.orm_search_read("ir.config_parameter", fields=["key"])
         self.assertEqual(cm2.exception.code, "model_not_allowed")
+        with self.assertRaises(StydOrmError) as cm3:
+            self.orm.orm_read_group("res.groups", group_by=[], aggregates=[])
+        self.assertEqual(cm3.exception.code, "model_not_allowed")
 
     # 5. search-read works for res.partner with safe fields
     def test_05_search_read_partner_safe(self):
@@ -186,7 +205,7 @@ class TestStydOrmBridge(TransactionCase):
         self.assertEqual(cm.exception.code, "field_not_allowed")
         # non-allowlisted model still rejected (model check runs first)
         with self.assertRaises(StydOrmError) as cm2:
-            self.orm.orm_read_group("res.users", group_by=[], aggregates=[])
+            self.orm.orm_read_group("ir.config_parameter", group_by=[], aggregates=[])
         self.assertEqual(cm2.exception.code, "model_not_allowed")
         # domain validation still enforced with an empty group_by
         with self.assertRaises(StydOrmError) as cm3:
@@ -246,3 +265,122 @@ class TestStydOrmBridge(TransactionCase):
         with self.assertRaises(StydOrmError) as cmu:
             self.orm._orm_validate_aggregates(meta, ["does_not_exist:sum"])
         self.assertEqual(cmu.exception.code, "field_not_allowed")
+
+    # 16. (req #1 + #5) allowlisted models that ARE installed can be requested,
+    #     and credential fields are never exposed -- incl. the newly-allowed
+    #     res.users / res.company alongside the long-supported res.partner.
+    def test_16_allowed_base_models_requestable(self):
+        safe_fields = {
+            "res.partner": ["name"],
+            "res.users": ["login", "name"],
+            "res.company": ["name"],
+        }
+        for model_name, fnames in safe_fields.items():
+            meta = self.orm.orm_model_fields(model_name)
+            self.assertTrue(meta, "expected field metadata for %s" % model_name)
+            for f in meta:
+                low = f["name"].lower()
+                for bad in self.orm.FORBIDDEN_FIELD_SUBSTRINGS:
+                    self.assertNotIn(bad, low)
+            result = self.orm.orm_search_read(model_name, fields=fnames, limit=1)
+            self.assertIn("records", result)
+        # res.users: useful identity fields are exposed, secrets are stripped.
+        user_fields = {f["name"] for f in self.orm.orm_model_fields("res.users")}
+        self.assertIn("login", user_fields)
+        self.assertNotIn("password", user_fields)
+
+    # 17. (req #3) a model that is allowlisted but whose Odoo app is NOT installed
+    #     fails gracefully with `model_not_installed` (never a crash / 500), and
+    #     is silently skipped from the /models listing.
+    def test_17_optional_app_models_fail_gracefully(self):
+        candidates = [
+            "sale.order", "account.move", "mrp.production", "maintenance.request",
+            "purchase.order", "crm.lead", "project.task", "stock.warehouse",
+        ]
+        # Robust on any DB: assert only on those genuinely absent here.
+        missing = [m for m in candidates
+                   if m in self.orm.MODEL_ALLOWLIST and m not in self.env]
+        self.assertTrue(missing, "expected allowlisted-but-uninstalled models in a base-only DB")
+        listed = {m["model"] for m in self.orm.orm_list_models()}
+        for model_name in missing:
+            with self.assertRaises(StydOrmError) as cm:
+                self.orm.orm_model_fields(model_name)
+            self.assertEqual(cm.exception.code, "model_not_installed")
+            with self.assertRaises(StydOrmError) as cm2:
+                self.orm.orm_search_read(model_name, fields=["name"], limit=5)
+            self.assertEqual(cm2.exception.code, "model_not_installed")
+            with self.assertRaises(StydOrmError) as cm3:
+                self.orm.orm_read_group(model_name, group_by=[], aggregates=[])
+            self.assertEqual(cm3.exception.code, "model_not_installed")
+            self.assertNotIn(model_name, listed)
+
+    # 18. (req #2) the allowlist is exactly the reviewed business set, and none of
+    #     the dangerous / private / config / security models are ever included.
+    #     Pinned on purpose: changing the bridge's data surface must be deliberate.
+    def test_18_allowlist_contents_and_exclusions(self):
+        expected = {
+            "res.partner", "res.company", "res.users",
+            "sale.order", "sale.order.line",
+            "account.move", "account.move.line", "account.payment",
+            "account.journal", "account.account", "account.tax",
+            "product.template", "product.product", "product.category", "uom.uom",
+            "stock.quant", "stock.location", "stock.move", "stock.move.line",
+            "stock.picking", "stock.picking.type", "stock.warehouse",
+            "purchase.order", "purchase.order.line",
+            "crm.lead", "crm.stage", "crm.team",
+            "project.project", "project.task",
+            "mrp.production", "mrp.workorder", "mrp.bom", "mrp.bom.line",
+            "maintenance.equipment", "maintenance.request", "maintenance.team",
+        }
+        self.assertEqual(set(self.orm.MODEL_ALLOWLIST), expected)
+        forbidden = {
+            "ir.config_parameter", "ir.attachment", "mail.message", "mail.thread",
+            "res.groups", "ir.model.access", "ir.rule", "ir.module.module",
+            "hr.employee", "auth_totp.device", "res.users.apikeys",
+        }
+        self.assertEqual(set(self.orm.MODEL_ALLOWLIST) & forbidden, set())
+
+    # 19. (req #4) the ORM transport is read-only: it exposes ONLY read primitives,
+    #     advertises the documented access mode, and running those primitives never
+    #     mutates the database.
+    def test_19_bridge_is_read_only(self):
+        public = {n for n in dir(self.orm) if n.startswith("orm_")}
+        self.assertEqual(
+            public,
+            {"orm_list_models", "orm_model_fields", "orm_search_read", "orm_read_group"},
+        )
+        for writer in ("orm_create", "orm_write", "orm_unlink", "orm_copy",
+                       "orm_call", "orm_call_kw", "orm_action"):
+            self.assertFalse(hasattr(self.orm, writer), writer)
+        self.assertEqual(self.orm.ACCESS_MODE, "sudo_company_scoped")
+        # Behavioural: the read path leaves the row count unchanged.
+        self.env["res.partner"].create({"name": "STYD RO Probe"})
+        before = self.env["res.partner"].search_count([])
+        self.orm.orm_search_read("res.partner", fields=["name"], limit=50)
+        self.orm.orm_read_group("res.partner", group_by=["company_type"], aggregates=[])
+        self.orm.orm_model_fields("res.partner")
+        self.orm.orm_list_models()
+        self.assertEqual(self.env["res.partner"].search_count([]), before)
+
+    # 20. (req #4) the HTTP surface exposes no state-changing verbs -- every bridge
+    #     route is GET or POST (POST only carries a read query body).
+    def test_20_controller_exposes_no_write_verbs(self):
+        from odoo.addons.styd_odoo_bridge.controllers.bridge_api import StydBridgeApi
+        routed = 0
+        for attr_name in dir(StydBridgeApi):
+            routing = getattr(getattr(StydBridgeApi, attr_name), "routing", None)
+            if not routing:
+                continue
+            routed += 1
+            methods = set(routing.get("methods") or [])
+            for verb in ("PUT", "PATCH", "DELETE"):
+                self.assertNotIn(verb, methods)
+            self.assertTrue(methods.issubset({"GET", "POST"}), methods)
+        # Guard against the routing metadata shape changing under us.
+        self.assertGreaterEqual(routed, 8)
+
+    # 21. (req #6) the manifest version was bumped to 19.0.0.7.0.
+    def test_21_manifest_version_bumped(self):
+        from odoo.modules.module import get_manifest
+        manifest = get_manifest("styd_odoo_bridge")
+        self.assertEqual(manifest.get("version"), "19.0.0.7.0")
