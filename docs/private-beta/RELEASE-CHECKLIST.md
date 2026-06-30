@@ -17,7 +17,7 @@ Record actual values in the “Result” column for each release.*
 | Odoo series | 19.0 | ☐ |
 | Odoo Bridge module version (`__manifest__.py`) | `19.0.0.7.0` | ☐ |
 | STYD API / app release (deployed) | `<release / commit>` | ☐ |
-| Bridge repo | `silkflo/odoo-bridge-v2` @ `main` | ☐ |
+| Bridge repo | `silkflo/odoo-bridge` @ `main` | ☐ |
 | STYD app repo | `silkflo/universal-db-ai` @ `main` | ☐ |
 
 ## 2. Bridge health test
@@ -85,7 +85,7 @@ Record actual values in the “Result” column for each release.*
 - [ ] Read‑only; no writes of any kind.
 - [ ] **Company‑scoped** (`sudo_company_scoped`) — **not** per‑user record‑rule
       enforcement yet.
-- [ ] Odoo **19.0 self‑hosted only**; **Odoo Online not supported**.
+- [ ] **Self-hosted Odoo (15.0-19.0)**; **Odoo Online not supported**.
 - [ ] Allow‑listed models only (customers, products, sales orders, invoices, lines).
 - [ ] Beta build — interfaces/questions/versions may change between builds.
 

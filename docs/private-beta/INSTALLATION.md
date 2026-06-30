@@ -12,8 +12,8 @@ before going live.
 
 ## 1. Requirements
 
-- **Self‑hosted Odoo 19.0** (Community or Enterprise) that you control
-  (on‑premise, VPS, or Docker). **Odoo Online is not supported** — it does not allow
+- **Self-hosted Odoo (15.0-19.0)** (Community or Enterprise) that you control
+  (on-premise, VPS, or Docker). **Odoo Online is not supported** — it does not allow
   custom server addons.
 - Odoo **administrator** access and the ability to edit `addons_path` / restart Odoo.
 - **HTTPS** on the Odoo instance (strongly recommended; required for any real‑data
@@ -24,14 +24,18 @@ before going live.
 
 ## 2. Odoo version
 
-Use the module folder that matches your Odoo series. For this beta:
+Validated bridge packages are available for Odoo 15.0, 16.0, 17.0, 18.0, and 19.0.
+Use the module folder that matches your Odoo major version:
 
 ```text
-19.0/styd_odoo_bridge        ← validated, version 19.0.0.7.0  (use this)
+15.0/styd_odoo_bridge
+16.0/styd_odoo_bridge
+17.0/styd_odoo_bridge
+18.0/styd_odoo_bridge
+19.0/styd_odoo_bridge
 ```
 
-Folders for 15.0–18.0 exist in the repository but are **not** part of this validated
-beta. Do not mix series.
+Install only the package that matches your Odoo major version. Do not mix series.
 
 ## 3. Install the module from the addon folder (manual)
 
@@ -44,13 +48,13 @@ If you have repository access, you can instead clone it:
 ```bash
 # On the Odoo server
 cd /tmp
-rm -rf odoo-bridge-v2
-git clone https://github.com/silkflo/odoo-bridge-v2.git
+rm -rf odoo-bridge
+git clone https://github.com/silkflo/odoo-bridge.git
 
-# Copy ONLY the 19.0 module into your custom addons directory
+# Copy ONLY your Odoo major version's module into your custom addons directory
 sudo mkdir -p /opt/odoo/custom-addons
 sudo rm -rf /opt/odoo/custom-addons/styd_odoo_bridge
-sudo cp -r /tmp/odoo-bridge-v2/19.0/styd_odoo_bridge /opt/odoo/custom-addons/styd_odoo_bridge
+sudo cp -r /tmp/odoo-bridge/19.0/styd_odoo_bridge /opt/odoo/custom-addons/styd_odoo_bridge
 sudo chown -R odoo:odoo /opt/odoo/custom-addons/styd_odoo_bridge
 sudo chmod -R 755 /opt/odoo/custom-addons/styd_odoo_bridge
 ```
@@ -148,7 +152,7 @@ and re‑copy.
 
 ## 9. Copy the token into Speak To Your Database
 
-1. Open Speak To Your Database → workspace **Settings → Odoo**.
+1. Open Speak To Your Database → workspace **Settings → Connections**.
 2. Select / create the Odoo connection.
 3. Enter your **Odoo base URL** (e.g. `https://your-odoo-domain.com`).
 4. Paste the **same token** generated in step 6.

@@ -5,7 +5,7 @@
 > the Odoo marketplace, and it should **not** be treated as production‑ready. Please
 > read the [Beta disclaimer](#beta-disclaimer) before installing.
 
-Validated module version: **`19.0.0.7.0`** · Odoo series: **19.0** · Mode: **read‑only**
+Validated bridge packages: **Odoo 15.0, 16.0, 17.0, 18.0, and 19.0** · Mode: **read‑only**
 
 ---
 
@@ -46,13 +46,12 @@ engine, not a write channel, and not a replacement for Odoo reporting.
 - Interfaces, supported questions, and version numbers **may change** during the
   beta. Expect to re‑install or upgrade the module between beta builds.
 
-## Supported Odoo version
+## Supported Odoo versions
 
-- **Validated for this beta:** Odoo **19.0**, module folder `19.0/styd_odoo_bridge`,
-  version **`19.0.0.7.0`**.
-- The repository also contains module folders for Odoo 15.0–18.0, but **only 19.0 is
-  part of this validated private‑beta package.** Use another series only if Speak To
-  Your Database support explicitly asks you to.
+- **Validated bridge packages are available for Odoo 15.0, 16.0, 17.0, 18.0, and
+  19.0**, in the matching `15.0/styd_odoo_bridge` through `19.0/styd_odoo_bridge`
+  module folders. Install the package matching your Odoo major version.
+- **Self-hosted Odoo and Odoo.sh are supported.**
 - **Odoo Online (odoo.com‑hosted) is not supported** in this beta — it does not allow
   installing custom server addons. A self‑hosted Odoo instance is required.
 

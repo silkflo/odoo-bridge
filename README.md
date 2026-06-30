@@ -10,80 +10,40 @@ The bridge is **read-only**. It uses the Odoo ORM, sends **no SQL to Odoo**, and
 
 ## Supported Odoo versions
 
-| Odoo version | Bridge module folder    | Status                                   | Recommended path                        |
-| ------------ | ----------------------- | ---------------------------------------- | --------------------------------------- |
-| Odoo 19.0    | `19.0/styd_odoo_bridge` | Marketplace baseline / validated release | Use the bridge                          |
-| Odoo 18.0    | `18.0/styd_odoo_bridge` | Marketplace release / validated release  | Use the bridge                          |
-| Odoo 17.0    | `17.0/styd_odoo_bridge` | Beta tester folder available             | Bridge beta or direct database fallback |
-| Odoo 16.0    | `16.0/styd_odoo_bridge` | Beta tester folder available             | Bridge beta or direct database fallback |
-| Odoo 15.0    | `15.0/styd_odoo_bridge` | Beta tester folder available             | Bridge beta or direct database fallback |
+Validated bridge packages are available for **Odoo 15.0, 16.0, 17.0, 18.0, and 19.0**, for self-hosted Odoo and Odoo.sh. Install the package matching your Odoo major version.
 
-> ⚠️ **Odoo 18.0 and Odoo 19.0 are the validated marketplace bridge releases.**
-> The Odoo 15.0, 16.0, and 17.0 folders are available for beta testers and early adopters, but they are **not marketplace-validated yet** after the latest bridge and answer-engine upgrades. If you are not participating in beta validation for those versions, use a secured direct database connection instead.
+| Odoo version | Bridge module folder    | Status                   | Hosting               |
+| ------------ | ----------------------- | ------------------------ | --------------------- |
+| Odoo 19.0    | `19.0/styd_odoo_bridge` | Validated bridge package | Self-hosted / Odoo.sh |
+| Odoo 18.0    | `18.0/styd_odoo_bridge` | Validated bridge package | Self-hosted / Odoo.sh |
+| Odoo 17.0    | `17.0/styd_odoo_bridge` | Validated bridge package | Self-hosted / Odoo.sh |
+| Odoo 16.0    | `16.0/styd_odoo_bridge` | Validated bridge package | Self-hosted / Odoo.sh |
+| Odoo 15.0    | `15.0/styd_odoo_bridge` | Validated bridge package | Self-hosted / Odoo.sh |
 
-> ⚠️ **Install only the folder matching your Odoo major version.**
-> Do not install the Odoo 19.0 bridge folder on Odoo 15.0, 16.0, 17.0, or 18.0. Do not install the Odoo 18.0 bridge folder on Odoo 15.0, 16.0, 17.0, or 19.0.
+> ⚠️ **Install the package matching your Odoo major version.**
+> Each bridge package is built for one Odoo major version. Do not install a bridge package built for one Odoo major version on another — for example, do not install the Odoo 19.0 package on Odoo 18.0, or the Odoo 18.0 package on Odoo 17.0.
+
+> **Odoo Online is not supported**, because custom server modules cannot be installed there.
 
 ---
 
 ## Choose your setup path
 
-### Path A — Odoo 18.0–19.0 marketplace bridge
+### Self-hosted Odoo or Odoo.sh (supported)
 
-For Odoo 18.0 and Odoo 19.0 users, the recommended path is the official Speak To Your Database Odoo Bridge module.
+For Odoo 15.0, 16.0, 17.0, 18.0, and 19.0 on self-hosted Odoo or Odoo.sh, use the Speak To Your Database Odoo Bridge module.
 
-1. Install the Speak To Your Database Odoo Bridge from the Odoo Apps marketplace for your Odoo major version.
-2. Configure the bridge in Odoo.
-3. Connect it in Speak To Your Database under [Settings → Odoo](https://speaktoyourdatabase.com/settings?tab=odoo).
+1. Install the bridge package matching your Odoo major version — from the Odoo Apps marketplace, or by manual GitHub installation for self-hosted and Odoo.sh deployments, development, and review.
+2. Configure the bridge in Odoo: enable it, choose the connector owner, and generate a token.
+3. Connect it in Speak To Your Database under [Settings → Connections](https://speaktoyourdatabase.com/settings?tab=connections).
 
-Manual GitHub installation is also available for self-hosted deployments, Odoo.sh deployments, development, review, and advanced users.
-
----
-
-### Path B — Odoo 15.0–17.0 bridge beta
-
-For Odoo 15.0, 16.0, and 17.0, matching bridge folders are available in this repository for beta testers.
-
-Use the matching folder only:
-
-```text
-15.0/styd_odoo_bridge
-16.0/styd_odoo_bridge
-17.0/styd_odoo_bridge
-```
-
-These versions have bridge folders available for early validation, but full prompt/answer behavior should be revalidated after the latest bridge and answer-engine upgrades.
-
-Use this path if:
-
-* you are comfortable testing the bridge before marketplace validation for your Odoo version;
-* you can verify install, health, connection, and supported questions in your own environment;
-* you understand that behavior may still change before official release for that Odoo series.
+The bridge is read-only: no SQL is sent to Odoo, and there is no write path — no create, update, delete, or business actions. An external Speak To Your Database account and service connection is required.
 
 ---
 
-### Path C — Direct database fallback
+### Odoo Online (not supported)
 
-For Odoo 15.0–17.0 users who do not want to test the bridge beta yet, use a secured direct PostgreSQL/database connection instead.
-
-This fallback can also be used for any Odoo deployment where installing a custom bridge module is not possible.
-
-Configure it in Speak To Your Database under [Settings → Connections](https://speaktoyourdatabase.com/settings?tab=connections).
-
-This fallback must use:
-
-* a dedicated read-only database user;
-* restricted network access;
-* IP allow-listing, VPN, SSH tunnel, or read replica where appropriate;
-* no broad admin database credentials.
-
----
-
-### Path D — Odoo Online
-
-The bridge is **not supported** on Odoo Online because custom Python server modules cannot be installed there.
-
-A direct database connection is usually not available on Odoo Online either.
+The bridge is **not supported** on Odoo Online, because custom Python server modules cannot be installed there.
 
 If you are unsure what is possible for your Odoo hosting plan, contact us.
 
@@ -120,7 +80,7 @@ The bridge does not:
 * send SQL to Odoo;
 * expose database credentials to Speak To Your Database;
 * give invited workspace users automatic access to everything the connector owner can access;
-* guarantee exact per-user Odoo record-rule parity in the current beta.
+* guarantee exact per-user Odoo record-rule parity in the current bridge access model.
 
 In the current bridge access model, access is company-scoped through the configured connector owner. Speak To Your Database may reduce access further through workspace restrictions.
 
@@ -135,7 +95,7 @@ For a manual bridge installation, the installation has four main steps:
 3. Restart Odoo, then install or activate the bridge from the Odoo Apps screen.
 4. Open the connection setup in Odoo, enable the bridge, choose the connector owner, generate a token, and save.
 
-For Odoo 18.0 and Odoo 19.0 marketplace users, the marketplace installation replaces the manual copy step. The Odoo Apps marketplace provides the module **package**; an Odoo administrator still installs it like any other third-party module (there is no one-click marketplace install).
+When you install from the Odoo Apps marketplace, the marketplace installation replaces the manual copy step. The Odoo Apps marketplace provides the module **package**; an Odoo administrator still installs it like any other third-party module (there is no one-click marketplace install).
 
 ### Detailed guides
 
@@ -163,7 +123,7 @@ Odoo 15.0 → 15.0/styd_odoo_bridge
 
 ### Recommended manual install from GitHub
 
-Replace `19.0` with your Odoo major version. Odoo 18.0 and Odoo 19.0 are validated releases. Odoo 15.0–17.0 are beta folders.
+Replace `19.0` with your Odoo major version. Validated bridge packages are available for Odoo 15.0, 16.0, 17.0, 18.0, and 19.0 — use the package matching your Odoo major version.
 
 ```bash
 cd /tmp
@@ -178,7 +138,7 @@ sudo chown -R odoo:odoo /opt/odoo/custom-addons/styd_odoo_bridge
 sudo chmod -R 755 /opt/odoo/custom-addons/styd_odoo_bridge
 ```
 
-For an Odoo 17 beta test, for example, use:
+For Odoo 17.0, for example, use:
 
 ```bash
 sudo cp -r /tmp/odoo-bridge/17.0/styd_odoo_bridge /opt/odoo/custom-addons/styd_odoo_bridge
@@ -477,12 +437,11 @@ If you receive `bridge_disabled`, go back to the Odoo connection setup, enable t
 
 After the health endpoint works:
 
-1. Open [Settings → Odoo](https://speaktoyourdatabase.com/settings?tab=odoo) in Speak To Your Database.
+1. Open [Settings → Connections](https://speaktoyourdatabase.com/settings?tab=connections) in Speak To Your Database and choose **New connection → Odoo Bridge**.
 2. Paste the Odoo base URL.
 3. Paste the bridge token.
-4. Enter the database name if needed.
-5. Click `Test connection`.
-6. Click `Save connection`.
+4. Click `Test connection`.
+5. Click `Save connection`.
 
 After connecting, Speak To Your Database should display:
 
@@ -496,35 +455,9 @@ After connecting, Speak To Your Database should display:
 
 ---
 
-## Direct database fallback for Odoo 15.0–17.0
-
-For Odoo 15.0, 16.0, and 17.0 users who do not want to test the bridge beta yet, use a secured, read-only direct database connection instead.
-
-Configure the connection under [Settings → Connections](https://speaktoyourdatabase.com/settings?tab=connections).
-
-Use:
-
-* a dedicated read-only database user;
-* restricted network access;
-* IP allow-listing, VPN, SSH tunnel, or read replica where appropriate.
-
-Do **not** use:
-
-* the Odoo application superuser;
-* broad admin database credentials;
-* a database account that can write, update, delete, or manage schema.
-
-Important limitations:
-
-* A direct database connection does **not** reproduce exact Odoo per-user record rules.
-* Access is controlled by database permissions and Speak To Your Database workspace restrictions, not by Odoo's native record rules.
-* Direct database fallback is acceptable only when it is secured, read-only, and intentionally scoped.
-
----
-
 ## Endpoints
 
-The validated Odoo 18.0 and Odoo 19.0 bridge releases expose the following read-only endpoints:
+The bridge exposes the following read-only endpoints:
 
 ```text
 /styd_bridge/v1/health
@@ -538,9 +471,7 @@ The validated Odoo 18.0 and Odoo 19.0 bridge releases expose the following read-
 /styd_bridge/v1/read-group
 ```
 
-The `/models`, `/models/<model>/fields`, `/search-read`, and `/read-group` endpoints are provided by the validated Odoo 18.0 and Odoo 19.0 bridge releases.
-
-The Odoo 15.0–17.0 bridge folders are available for beta validation. Depending on the bridge version installed, some newer ORM endpoints may not yet be available or may require additional validation.
+The `/models`, `/models/<model>/fields`, `/search-read`, and `/read-group` endpoints provide read-only model metadata, record reads, and grouped aggregations.
 
 Every endpoint requires a valid bridge token sent as:
 
@@ -707,11 +638,9 @@ This is especially important on Odoo servers hosting multiple databases.
 
 ---
 
-### Odoo 15.0–17.0 bridge beta behavior is inconsistent
+### Bridge answers look inconsistent
 
-The older-version bridge folders are available for beta validation, but full prompt/answer behavior should be revalidated after the latest upgrades.
-
-If you encounter inconsistent behavior:
+If bridge answers look inconsistent:
 
 1. Confirm the bridge health endpoint works.
 2. Confirm the user directory endpoint works.
@@ -719,8 +648,6 @@ If you encounter inconsistent behavior:
 4. Confirm the connection is saved in Speak To Your Database.
 5. Test a small set of supported business questions.
 6. Report the issue with your Odoo version, edition, bridge version, and the question asked.
-
-If you are not participating in beta validation, use the direct database fallback instead.
 
 ---
 
@@ -734,15 +661,13 @@ If you are unsure about your hosting, contact us.
 
 ---
 
-## Beta and security notes
+## Security notes
 
-* Odoo 18.0 and Odoo 19.0 are the validated marketplace bridge releases.
-* Odoo 15.0–17.0 bridge folders are available for beta testers and early adopters, but are not marketplace-validated yet.
+* Validated bridge packages are available for Odoo 15.0, 16.0, 17.0, 18.0, and 19.0 for self-hosted Odoo and Odoo.sh. Install the package matching your Odoo major version.
+* An external Speak To Your Database account and service connection is required.
 * The current bridge access model is company-scoped through the connector owner. Exact per-user record-rule parity is not guaranteed yet.
 * The bridge is read-only: it uses the Odoo ORM, sends no SQL to Odoo, and never writes, creates, updates, or deletes records.
-* The validated bridge releases record a read-only access log. (audit trail) of bridge requests in Odoo, storing only a non-reversible token fingerprint — never the raw token or business data.
-* Direct database fallback is acceptable only when it is secured and read-only, with a dedicated read-only database user and restricted network access.
-* Direct database fallback does not reproduce exact Odoo per-user permissions.
+* The bridge records a read-only access log (audit trail) of bridge requests in Odoo, storing only a non-reversible token fingerprint — never the raw token or business data.
 * Use a strong bridge token, store it securely, and use HTTPS in production.
 * The bridge should be installed only by an Odoo administrator or trusted developer.
 * The bridge exposes metadata and supported read-only Odoo access used for security and planning, not uncontrolled database access.
@@ -752,12 +677,6 @@ Effective access in bridge mode is:
 
 ```text
 trusted Odoo company scope ∩ Speak To Your Database workspace restrictions
-```
-
-Effective access in direct database fallback mode is:
-
-```text
-database user permissions ∩ Speak To Your Database workspace restrictions
 ```
 
 ---
