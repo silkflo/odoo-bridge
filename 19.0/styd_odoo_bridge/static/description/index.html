@@ -2,144 +2,57 @@
   <div class="oe_row oe_spaced">
     <div class="oe_span12 text-center">
       <img src="icon.png" alt="Speak To Your Database" style="max-width: 96px; height: auto; margin-bottom: 24px;" />
-      <h1 class="oe_slogan">Ask Odoo Business Questions. Get Answers You Can Verify.</h1>
+      <h1 class="oe_slogan">Turn Odoo data into clear business answers</h1>
+
+      ```
       <h3 class="oe_slogan">
-        Speak To Your Database Odoo Bridge connects self-hosted Odoo 19.0 and Odoo.sh to Speak To Your Database through
-        a secure, read-only Odoo ORM bridge.
+        Connect self-hosted Odoo 19.0 or Odoo.sh to Speak To Your Database with a secure, read-only bridge.
       </h3>
+
       <p class="oe_mt32">
-        Ask plain-language business questions about customers, sales, products, stock, purchase orders, invoices, vendor
-        bills, and CRM opportunities. Get answers from your live Odoo data with source, confidence, and clear
-        calculation
-        details.
+        Ask business questions in plain language and get answers from your live Odoo data. Check customers, sales,
+        products, stock, purchase orders, invoices, vendor bills, CRM, and opportunities without giving away direct
+        database access.
       </p>
+
       <p>
-        Safe by design: read-only Odoo ORM access, no direct database credentials exposed, no write path, and
-        unsupported
-        questions fail closed instead of guessing.
+        Safe by design: read-only Odoo ORM access, no SQL sent to Odoo, no direct database credentials exposed,
+        and no write path.
       </p>
+
       <p>
-        <strong>Odoo 19.0</strong> | <strong>Self-hosted / Odoo.sh</strong> | <strong>Read-only</strong> |
+        <strong>Odoo 19.0</strong> |
+        <strong>Self-hosted / Odoo.sh</strong> |
+        <strong>Read-only</strong> |
+        <strong>Validated bridge release</strong> |
         <strong>External Speak To Your Database service required</strong>
       </p>
     </div>
+    ```
+
   </div>
 </section>
 
 <section class="oe_container oe_dark">
   <div class="oe_row oe_spaced">
-    <div class="oe_span12">
-      <h2>The problem</h2>
+    <div class="oe_span12 text-center">
+      <h2>What it does</h2>
       <p>
-        Your Odoo data is one of your most valuable assets, but getting quick answers from it safely is hard.
-      </p>
-      <ul>
-        <li>Business users need answers quickly: sales this month, unpaid invoices, purchase orders, stock levels,
-          opportunities, and more.</li>
-        <li>Custom reports and exports take time.</li>
-        <li>Raw database access should not be casually shared with dashboards or AI tools.</li>
-        <li>AI answers need to be verifiable before users act on them.</li>
-      </ul>
-    </div>
-  </div>
-</section>
-
-<section class="oe_container">
-  <div class="oe_row oe_spaced">
-    <div class="oe_span12">
-      <h2>The solution</h2>
-      <p>
-        Speak To Your Database Odoo Bridge is a small security-focused Odoo module. It gives Speak To Your Database a
-        controlled read-only path into Odoo through the Odoo ORM.
-      </p>
-      <ol>
-        <li><strong>Install the bridge</strong> in your self-hosted Odoo 19.0 or Odoo.sh environment.</li>
-        <li><strong>Generate a bridge token</strong> in Odoo and connect it to Speak To Your Database.</li>
-        <li><strong>Ask supported business questions</strong> and receive answers with source, confidence, and
-          calculation details.</li>
-      </ol>
-    </div>
-  </div>
-</section>
-
-<section class="oe_container">
-  <div class="oe_row oe_spaced">
-    <div class="oe_span12">
-      <h2>Installation (self-hosted Odoo &amp; Odoo.sh)</h2>
-      <p>
-        The Odoo Apps marketplace provides the module <em>package</em>. There is no one-click marketplace install:
-        an Odoo administrator installs it like any other third-party Odoo module.
-      </p>
-      <ol>
-        <li>Download the module package for <strong>Odoo 19.0</strong>.</li>
-        <li>Copy the <code>styd_odoo_bridge</code> module folder into your custom addons path.</li>
-        <li>Restart Odoo.</li>
-        <li>In Odoo, open <strong>Apps</strong> and click <strong>Update Apps List</strong>.</li>
-        <li>Search for <strong>Speak To Your Database</strong>, then install / activate / upgrade from the Odoo UI.</li>
-      </ol>
-      <p>
-        After installing, open <strong>Connection Setup</strong> in Odoo, enable the bridge, choose the connector
-        owner, generate a token (shown once), and connect it in Speak To Your Database. Odoo Online (odoo.com) is
-        not supported, because custom server modules cannot be installed there.
-      </p>
-    </div>
-  </div>
-</section>
-
-<section class="oe_container oe_dark">
-  <div class="oe_row oe_spaced">
-    <div class="oe_span12">
-      <h2>Example questions</h2>
-      <p>
-        The bridge supports deterministic business questions, with more added over time.
+        Speak To Your Database helps teams explore Odoo data faster while keeping the connection controlled,
+        read-only, and easy to validate.
       </p>
       <table class="table table-bordered">
         <tbody>
           <tr>
-            <td>show customers</td>
-            <td>count customers</td>
-          </tr>
-          <tr>
-            <td>show products</td>
-            <td>products that are out of stock</td>
-          </tr>
-          <tr>
-            <td>show current stock by product</td>
-            <td>show inventory quantities by location</td>
-          </tr>
-          <tr>
-            <td>sales orders this month</td>
-            <td>quotations this month</td>
-          </tr>
-          <tr>
-            <td>total sales this month</td>
-            <td>top customers</td>
-          </tr>
-          <tr>
-            <td>show unpaid customer invoices</td>
-            <td>show overdue customer invoices</td>
-          </tr>
-          <tr>
-            <td>which customers owe us money?</td>
-            <td>show vendor bills</td>
-          </tr>
-          <tr>
-            <td>which vendors do we owe money to?</td>
-            <td>show purchase orders by vendor</td>
-          </tr>
-          <tr>
-            <td>show CRM leads</td>
-            <td>show CRM pipeline by stage</td>
-          </tr>
-          <tr>
-            <td>show opportunities by salesperson</td>
-            <td>show won opportunities</td>
+            <td><strong>Ask in plain language</strong><br />Use questions like total sales, low stock, unpaid invoices,
+              or recent purchase orders.</td>
+            <td><strong>Read live Odoo data</strong><br />Answers come from supported Odoo records through the Odoo ORM.
+            </td>
+            <td><strong>Keep access controlled</strong><br />No direct database password, no SQL sent to Odoo, and no
+              write path.</td>
           </tr>
         </tbody>
       </table>
-      <p>
-        Replace example customer names, product names, or SKUs with real values from your own Odoo database.
-      </p>
     </div>
   </div>
 </section>
@@ -147,15 +60,78 @@
 <section class="oe_container">
   <div class="oe_row oe_spaced">
     <div class="oe_span12">
-      <h2>Answers you can verify</h2>
+      <h2>Why teams use it</h2>
       <ul>
-        <li><strong>Source on every answer:</strong> Answers show that they came from Odoo Bridge.</li>
-        <li><strong>Confidence level:</strong> Deterministic answers include a confidence level.</li>
-        <li><strong>How this answer was calculated:</strong> Users can review the Odoo model, record type, filters,
-          grouping, limit, sort, and number of records matched.</li>
-        <li><strong>Safe fallback:</strong> Unsupported questions return a clear unsupported message instead of
-          guessing.</li>
+        <li>Faster answers for sales, purchasing, inventory, finance, CRM, and operations.</li>
+        <li>No need to hand out raw database credentials to users or external tools.</li>
+        <li>Read-only design with no create, update, delete, or business action execution.</li>
+        <li>Useful for internal teams, demos, pilots, and controlled AI-assisted reporting.</li>
       </ul>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container oe_dark">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12 text-center">
+      <h2>Bridge setup inside Odoo</h2>
+      <p>
+        Enable the bridge, choose the connector owner, generate a token, and save the connection setup directly
+        from Odoo.
+      </p>
+      <div class="oe_demo oe_picture oe_screenshot" style="max-width: 1100px; margin: 32px auto;">
+        <img src="images/bridge-connection-setup.png" alt="Speak To Your Database Odoo bridge connection setup"
+          style="width: 100%; height: auto; border-radius: 8px;" />
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12 text-center">
+      <h2>Connect it in Speak To Your Database</h2>
+      <p>
+        After the bridge is enabled in Odoo, connect it in Speak To Your Database using the Odoo base URL and bridge
+        token.
+      </p>
+      <div class="oe_demo oe_picture oe_screenshot" style="max-width: 1100px; margin: 32px auto;">
+        <img src="images/styd-odoo-bridge-connected.png"
+          alt="Odoo bridge connected successfully in Speak To Your Database"
+          style="width: 100%; height: auto; border-radius: 8px;" />
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container oe_dark">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12 text-center">
+      <h2>Get answers from live Odoo data</h2>
+      <p>
+        Ask business questions such as total sales this month, recent quotations, unpaid invoices, customer orders,
+        purchase orders, and stock levels.
+      </p>
+      <div class="oe_demo oe_picture oe_screenshot" style="max-width: 1100px; margin: 32px auto;">
+        <img src="images/bridge-total-sales-answer.png"
+          alt="Speak To Your Database answer showing total sales from Odoo"
+          style="width: 100%; height: auto; border-radius: 8px;" />
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12 text-center">
+      <h2>Answers you can review</h2>
+      <p>
+        Speak To Your Database focuses on answers that are understandable and easier to check before acting on them.
+      </p>
+      <div class="oe_demo oe_picture oe_screenshot" style="max-width: 1100px; margin: 32px auto;">
+        <img src="images/bridge-how-calculated.png" alt="How a Speak To Your Database Odoo answer was calculated"
+          style="width: 100%; height: auto; border-radius: 8px;" />
+      </div>
     </div>
   </div>
 </section>
@@ -165,19 +141,21 @@
     <div class="oe_span12">
       <h2>Security by design</h2>
       <ul>
-        <li><strong>Read-only ORM access:</strong> The bridge supports controlled reads, counts, and aggregations.</li>
-        <li><strong>No write path:</strong> No create, update, delete, or business-action execution.</li>
-        <li><strong>No direct database credentials exposed:</strong> Speak To Your Database connects through the Odoo
-          bridge token, not by sharing raw database credentials with users.</li>
-        <li><strong>Allow-listed models:</strong> Only selected standard business models are readable.</li>
-        <li><strong>Allow-listed fields:</strong> Sensitive credential, security, chatter, attachment, and configuration
-          fields are not exposed through the bridge.</li>
-        <li><strong>Token shown once:</strong> The bridge token is displayed only once when generated.</li>
-        <li><strong>Hash-at-rest in Odoo:</strong> Odoo stores only a SHA-256 hash of the bridge token.</li>
+        <li><strong>Read-only bridge:</strong> no create, update, delete, or business action execution.</li>
+        <li><strong>Odoo ORM only:</strong> no SQL is sent to Odoo.</li>
+        <li><strong>No direct database credentials:</strong> access is done through a bridge token, never your database
+          password.</li>
+        <li><strong>Token-based authentication:</strong> the token can be rotated or disabled in Odoo.</li>
+        <li><strong>Hash-at-rest:</strong> Odoo stores only a non-reversible token hash.</li>
+        <li><strong>Allow-listed models:</strong> only curated business models are exposed for supported access.</li>
+        <li><strong>Filtered fields:</strong> sensitive security, credential, attachment, and configuration fields are
+          excluded.</li>
+        <li><strong>Company-scoped access:</strong> reads are limited by the configured connector owner scope.</li>
       </ul>
       <p>
-        Current bridge access model: <code>sudo_company_scoped</code>. Results are scoped to the connector owner's Odoo
-        company boundary. Full per-user Odoo record-rule parity is not applied yet.
+        The current bridge access model is company-scoped through the configured connector owner. Exact per-user
+        Odoo record-rule parity is not guaranteed yet, and Speak To Your Database may further restrict access
+        through workspace controls.
       </p>
     </div>
   </div>
@@ -186,49 +164,34 @@
 <section class="oe_container">
   <div class="oe_row oe_spaced">
     <div class="oe_span12">
-      <h2>Supported Odoo areas</h2>
+      <h2>Supported business areas</h2>
       <table class="table table-bordered">
-        <thead>
-          <tr>
-            <th>Area</th>
-            <th>Examples of supported questions</th>
-          </tr>
-        </thead>
         <tbody>
           <tr>
             <td>Customers and contacts</td>
-            <td>show customers, count customers, customer orders</td>
+            <td>Sales orders and quotations</td>
           </tr>
           <tr>
-            <td>Sales and quotations</td>
-            <td>sales orders this month, quotations this month, total sales</td>
-          </tr>
-          <tr>
-            <td>Products</td>
-            <td>show products, product lookup, best-selling products where supported</td>
-          </tr>
-          <tr>
-            <td>Inventory / stock</td>
-            <td>current stock by product, out-of-stock products, stock quantities by location</td>
+            <td>Products and variants</td>
+            <td>Inventory and stock levels</td>
           </tr>
           <tr>
             <td>Purchase orders</td>
-            <td>show purchase orders, purchase orders by vendor, purchase order lines</td>
+            <td>Customer invoices and vendor bills</td>
           </tr>
           <tr>
-            <td>Customer invoices / AR</td>
-            <td>unpaid invoices, overdue invoices, paid invoices, AR aging, customers who owe money</td>
+            <td>CRM leads and opportunities</td>
+            <td>Company information</td>
           </tr>
           <tr>
-            <td>Vendor bills / AP</td>
-            <td>vendor bills, unpaid vendor bills, overdue vendor bills, vendors we owe money to</td>
-          </tr>
-          <tr>
-            <td>CRM visibility</td>
-            <td>leads, opportunities, pipeline by stage, won/lost opportunities, opportunities by salesperson</td>
+            <td>User directory</td>
+            <td>Access metadata</td>
           </tr>
         </tbody>
       </table>
+      <p>
+        Supported areas depend on the Odoo apps installed on your database.
+      </p>
     </div>
   </div>
 </section>
@@ -236,69 +199,20 @@
 <section class="oe_container oe_dark">
   <div class="oe_row oe_spaced">
     <div class="oe_span12">
-      <h2>Supported Odoo models</h2>
-      <table class="table table-bordered">
-        <thead>
-          <tr>
-            <th>Model</th>
-            <th>Used for</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><code>res.partner</code></td>
-            <td>Customers, contacts, vendors, and many2one display names</td>
-          </tr>
-          <tr>
-            <td><code>sale.order</code></td>
-            <td>Sales orders and quotations</td>
-          </tr>
-          <tr>
-            <td><code>account.move</code></td>
-            <td>Customer invoices, credit notes, and vendor bills</td>
-          </tr>
-          <tr>
-            <td><code>account.move.line</code></td>
-            <td>Invoice and bill lines where safely supported</td>
-          </tr>
-          <tr>
-            <td><code>product.template</code></td>
-            <td>Products</td>
-          </tr>
-          <tr>
-            <td><code>product.product</code></td>
-            <td>Product variants and SKU lookup</td>
-          </tr>
-          <tr>
-            <td><code>stock.quant</code></td>
-            <td>Inventory quantities by product and internal stock location</td>
-          </tr>
-          <tr>
-            <td><code>stock.location</code></td>
-            <td>Internal stock locations used to scope inventory questions</td>
-          </tr>
-          <tr>
-            <td><code>purchase.order</code></td>
-            <td>Purchase orders and vendor order visibility</td>
-          </tr>
-          <tr>
-            <td><code>purchase.order.line</code></td>
-            <td>Purchase order lines and purchased product quantities</td>
-          </tr>
-          <tr>
-            <td><code>crm.lead</code></td>
-            <td>CRM leads, opportunities, pipeline stages, teams, and salesperson display names</td>
-          </tr>
-          <tr>
-            <td><code>crm.stage</code></td>
-            <td>CRM stage labels where safely available</td>
-          </tr>
-          <tr>
-            <td><code>crm.team</code></td>
-            <td>CRM sales team labels where safely available</td>
-          </tr>
-        </tbody>
-      </table>
+      <h2>Read-only bridge endpoints</h2>
+      <p>
+        The bridge exposes supported read-only endpoints used by Speak To Your Database for health checks,
+        security metadata, model discovery, safe record reads, and controlled aggregations.
+      </p>
+      <ul>
+        <li>Bridge health</li>
+        <li>Security snapshot</li>
+        <li>User directory and user search</li>
+        <li>Capability snapshot</li>
+        <li>Model and field metadata</li>
+        <li>Read-only search and read operations</li>
+        <li>Read-only grouped aggregations</li>
+      </ul>
     </div>
   </div>
 </section>
@@ -306,17 +220,39 @@
 <section class="oe_container">
   <div class="oe_row oe_spaced">
     <div class="oe_span12">
+      <h2>Installation overview</h2>
+      <ol>
+        <li>Download the module package for Odoo 19.0.</li>
+        <li>Copy the <code>styd_odoo_bridge</code> folder into your custom addons path.</li>
+        <li>Restart Odoo.</li>
+        <li>Open <strong>Apps</strong> and click <strong>Update Apps List</strong>.</li>
+        <li>Search for <strong>Speak To Your Database</strong> and install the module.</li>
+        <li>Open the bridge settings in Odoo.</li>
+        <li>Enable the bridge, choose the connector owner, generate a token, and save.</li>
+        <li>Connect the bridge in Speak To Your Database.</li>
+      </ol>
+      <p>
+        The Odoo Apps marketplace provides the module package. Installation still follows the standard third-party
+        module workflow in Odoo. Odoo Online hosted on odoo.com is not supported because custom server modules cannot be
+        installed there.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container oe_dark">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12">
       <h2>Version support</h2>
       <p>
-        This Odoo Bridge module is currently validated for <strong>Odoo 19.0</strong> self-hosted and Odoo.sh
-        environments.
+        This package is for <strong>Odoo 19.0</strong> self-hosted and Odoo.sh environments.
       </p>
       <p>
-        Odoo Online is not supported because custom server modules cannot be installed there.
+        Use the package matching your Odoo major version. Do not install a bridge package built for one Odoo major
+        version on another Odoo major version.
       </p>
       <p>
-        Bridge support for older Odoo versions is planned after controlled validation. Until then, Speak To Your
-        Database can also connect through a secured read-only database connection where database access is available.
+        Odoo Online hosted on odoo.com is not supported because custom server modules cannot be installed there.
       </p>
       <p>
         Setup guide:
@@ -328,95 +264,30 @@
   </div>
 </section>
 
-<section class="oe_container oe_dark">
+<section class="oe_container">
   <div class="oe_row oe_spaced">
     <div class="oe_span12">
-      <h2>What is not supported yet</h2>
+      <h2>What is not supported</h2>
       <ul>
         <li>Odoo Online hosted on odoo.com.</li>
-        <li>Odoo Bridge marketplace installation for versions older than 19.0.</li>
-        <li>Arbitrary custom models and custom-module discovery.</li>
-        <li>Non-allow-listed models beyond the supported models listed above.</li>
-        <li>Full accounting reports such as P&amp;L, balance sheet, trial balance, general ledger, tax reports, and
-          reconciliation.</li>
-        <li>CRM forecasting, lead scoring, marketing attribution, campaign ROI, email/chatter analysis, or private
-          messages.</li>
-        <li>Projects, timesheets, manufacturing, maintenance, HR, fleet, helpdesk, subscriptions, rental, and POS
-          modules.</li>
-        <li>Warehouse-specific analytics beyond safe internal-location stock checks.</li>
         <li>Write, update, delete, or business actions of any kind.</li>
-        <li>Unrestricted SQL-style analytics or free-form query building through the bridge.</li>
+        <li>Raw SQL or free-form query building through the bridge.</li>
+        <li>Direct database credentials or database administration.</li>
+        <li>Arbitrary custom models and custom-module discovery.</li>
+        <li>Non-allow-listed models beyond supported business models.</li>
+        <li>Exact per-user Odoo record-rule parity in the current bridge access model.</li>
         <li>General-knowledge questions not answerable from your Odoo data.</li>
-        <li>Full per-user record-rule enforcement.</li>
       </ul>
-    </div>
-  </div>
-</section>
-
-<section class="oe_container">
-  <div class="oe_row oe_spaced">
-    <div class="oe_span12">
-      <h2>Validated in a controlled sandbox</h2>
-      <p>
-        The deterministic bridge skill pack is tested end-to-end in a controlled Odoo 19 sandbox with module version
-        <code>19.0.0.7.0</code>.
-      </p>
-      <ul>
-        <li>Read-only bridge connection and token flow validated.</li>
-        <li>Supported business modules tested through deterministic Odoo ORM requests.</li>
-        <li>Unsupported and sensitive prompts tested to fail closed.</li>
-        <li>Answer explanations tested to show business filters and records used.</li>
-      </ul>
-      <p>
-        These results reflect validation in a controlled Odoo 19 sandbox. They are evidence of current behavior, not a
-        warranty, uptime commitment, or production guarantee.
-      </p>
     </div>
   </div>
 </section>
 
 <section class="oe_container oe_dark">
-  <div class="oe_row oe_spaced">
-    <div class="oe_span12">
-      <h2>Product screenshots</h2>
-      <p>
-        See the Odoo Bridge setup, connection validation, live Odoo answers, and transparent calculation details.
-      </p>
-
-      <h3>Bridge connection setup</h3>
-      <p>Enable the bridge, manage the token, and copy the secure setup details from Odoo.</p>
-      <img class="oe_picture oe_screenshot img img-responsive" src="images/bridge-connection-setup.png"
-        alt="Odoo Bridge connection setup in Odoo"
-        style="max-width: 850px; width: 100%; height: auto; display: block; margin: 16px auto 40px;" />
-
-      <h3>Odoo Bridge connected in Speak To Your Database</h3>
-      <p>Validate the bridge connection and confirm the Odoo version, edition, and bridge status.</p>
-      <img class="oe_picture oe_screenshot img img-responsive" src="images/styd-odoo-bridge-connected.png"
-        alt="Speak To Your Database Odoo Bridge connected settings"
-        style="max-width: 850px; width: 100%; height: auto; display: block; margin: 16px auto 40px;" />
-
-      <h3>Odoo answer with source and confidence</h3>
-      <p>Ask plain-language business questions and see source, confidence, and verification.</p>
-      <img class="oe_picture oe_screenshot img img-responsive" src="images/bridge-total-sales-answer.png"
-        alt="Odoo Bridge answer with source confidence and verification"
-        style="max-width: 850px; width: 100%; height: auto; display: block; margin: 16px auto 40px;" />
-
-      <h3>How this answer was calculated</h3>
-      <p>Review the Odoo model, record type, business filters, records matched, and safety assumptions behind the
-        answer.</p>
-      <img class="oe_picture oe_screenshot img img-responsive" src="images/bridge-how-calculated.png"
-        alt="How this answer was calculated modal for Odoo Bridge"
-        style="max-width: 850px; width: 100%; height: auto; display: block; margin: 16px auto 40px;" />
-    </div>
-  </div>
-</section>
-
-<section class="oe_container">
   <div class="oe_row oe_spaced">
     <div class="oe_span12 text-center">
       <h2>Get started</h2>
       <p>
-        Install the free Odoo Bridge, connect it to Speak To Your Database, and start asking trusted business questions
+        Install the Odoo bridge, connect it to Speak To Your Database, and start asking trusted business questions
         from your live Odoo data.
       </p>
       <p>
@@ -425,11 +296,13 @@
         </a>
       </p>
       <p>
-        Module: <code>styd_odoo_bridge</code> | Version: <code>19.0.0.7.0</code> | Odoo: <code>19.0</code> | License:
-        <code>LGPL-3</code>
+        Module: <code>styd_odoo_bridge</code> |
+        Version: <code>19.0.0.7.0</code> |
+        Odoo: <code>19.0</code> |
+        License: <code>LGPL-3</code>
       </p>
       <p>
-        This module requires an external Speak To Your Database account and service connection.
+        This bridge requires an external Speak To Your Database account and service connection.
       </p>
     </div>
   </div>
