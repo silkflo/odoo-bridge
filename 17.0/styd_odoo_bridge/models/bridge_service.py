@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timezone
 
 from odoo import models, release
@@ -282,6 +283,28 @@ class StydOdooBridgeService(models.AbstractModel):
 
     def _get_bridge_token(self):
         return self._get_icp().get_param("styd_odoo_bridge.token", default="") or ""
+
+    def _get_bridge_token_hash(self):
+        return self._get_icp().get_param("styd_odoo_bridge.token_hash", default="") or ""
+
+    def _hash_token(self, token):
+        """Return the hex SHA-256 of a bearer token (hash-at-rest).
+
+        The token is high-entropy random, so a single SHA-256 is sufficient and
+        is what the controller compares (constant-time) against the stored hash.
+        Never logs or returns the raw token.
+        """
+        if not token:
+            return ""
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+    def _token_is_configured(self):
+        """True if a hashed token OR a legacy plaintext token is configured."""
+        return bool(self._get_bridge_token_hash()) or bool(self._get_bridge_token())
+
+    def _has_legacy_plaintext_token(self):
+        """True if a legacy plaintext token is still stored (rotation advised)."""
+        return bool(self._get_bridge_token())
 
     def _get_connector_owner_user_id(self):
         raw = self._get_icp().get_param("styd_odoo_bridge.connector_owner_user_id", default="")

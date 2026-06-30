@@ -1,1 +1,2 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_styd_odoo_bridge_access_log_admin,styd.odoo.bridge.access.log admin read,model_styd_odoo_bridge_access_log,base.group_system,1,0,0,0
