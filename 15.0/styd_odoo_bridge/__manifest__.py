@@ -1,5 +1,5 @@
 {
-    "name": "Speak To Your Database — Secure Odoo AI Connector",
+    "name": "Speak To Your Database - Secure Odoo AI Connector",
     "version": "15.0.0.8.0",
     "summary": "Secure read-only connector for Speak To Your Database.",
     "category": "Tools",
