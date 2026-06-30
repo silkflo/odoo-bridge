@@ -15,12 +15,6 @@
         "views/bridge_status_views.xml",
         "views/bridge_setup_views.xml",
     ],
-    "images": [
-        "static/description/images/bridge-connection-setup.png",
-        "static/description/images/styd-odoo-bridge-connected.png",
-        "static/description/images/bridge-total-sales-answer.png",
-        "static/description/images/bridge-how-calculated.png",
-    ],
-    "installable": True,
+     "installable": True,
     "application": True,
 }
