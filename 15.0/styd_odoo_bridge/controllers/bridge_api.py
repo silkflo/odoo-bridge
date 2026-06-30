@@ -1,19 +1,40 @@
 import json
+import logging
+
+from werkzeug.wrappers import Response
 
 from odoo import http
 from odoo.http import request
 
+# Read-only ORM primitives ported from the validated 16.0 implementation so the
+# STYD Data Guide can load Odoo models on Odoo 15. The allowlist / field-filter /
+# read-only guarantees live in bridge_orm.py and are identical to 16.0/17.0.
+from odoo.addons.styd_odoo_bridge.models.bridge_orm import (
+    ORM_ACCESS_MODE,
+    StydOrmError,
+)
+
+_logger = logging.getLogger(__name__)
+
 
 class StydBridgeApi(http.Controller):
     def _json_response(self, payload, status=200):
-        response = request.make_response(
-            json.dumps(payload, default=str),
+        # Build a werkzeug Response DIRECTLY rather than via request.make_response,
+        # so the response does not depend on the request type, and attach the JSON
+        # content-type plus no-store / nosniff headers. All bridge routes (GET and the
+        # POST ORM routes) are type="http"; the POST routes work on Odoo 15 because
+        # STYD sends their body with a text/plain Content-Type so Odoo's legacy
+        # framework dispatches them as plain HTTP (see the note on bridge_search_read).
+        body = json.dumps(payload, default=str)
+        return Response(
+            body,
+            status=status,
             headers=[
-            ("Content-Type", "application/json"),
+                ("Content-Type", "application/json"),
+                ("Cache-Control", "no-store"),
+                ("X-Content-Type-Options", "nosniff"),
             ],
         )
-        response.status_code = status
-        return response
 
     def _error_response(self, error, detail=None, status=400):
         payload = {
@@ -213,3 +234,189 @@ class StydBridgeApi(http.Controller):
                 str(exc),
                 status=500,
             )
+
+    # ------------------------------------------------------------------
+    # Read-only ORM endpoints (ported from the validated 16.0/17.0 module for
+    # STYD Data Guide support).
+    #
+    # Same routes, response shapes, allowlist, field-filtering and read-only
+    # behavior as 16.0. They reuse 15.0's existing access control (plaintext
+    # token via _check_bridge_access) and 15.0's existing _json_response (which
+    # already uses the Odoo-15-compatible `response.status_code = status`
+    # pattern). 15.0 has no audit-log model, so — exactly like the existing
+    # health/security/users/capabilities endpoints above — these do not write
+    # audit rows.
+    # ------------------------------------------------------------------
+    def _get_orm(self):
+        return request.env["styd.odoo.bridge.orm"].sudo()
+
+    def _parse_json_body(self):
+        """Parse the request body as a JSON object. Returns {} for an empty
+        body and None for invalid JSON (the caller maps None -> invalid_json).
+
+        The POST ORM routes are type="http", so the body is read from the raw request
+        stream. The request.jsonrequest check is a harmless fallback: it is populated
+        only if a request is ever dispatched via Odoo's JSON layer, and is None on the
+        normal type="http" path."""
+        jsonrequest = getattr(request, "jsonrequest", None)
+        if isinstance(jsonrequest, dict):
+            return jsonrequest
+        try:
+            raw = request.httprequest.get_data(as_text=True)
+        except Exception:
+            return None
+        if not raw:
+            return {}
+        try:
+            data = json.loads(raw)
+        except Exception:
+            return None
+        if not isinstance(data, dict):
+            return None
+        return data
+
+    @http.route(
+        "/styd_bridge/v1/models",
+        type="http",
+        auth="public",
+        methods=["GET"],
+        csrf=False,
+    )
+    def bridge_models(self, **kwargs):
+        access = self._check_bridge_access()
+        if not access["ok"]:
+            return access["response"]
+
+        orm = self._get_orm()
+        try:
+            models = orm.orm_list_models()
+        except Exception as exc:
+            _logger.warning(
+                "STYD bridge: /models failed (error_type=%s)", type(exc).__name__
+            )
+            return self._error_response("orm_error", "Failed to list models.", status=500)
+
+        return self._json_response(
+            {"ok": True, "access_mode": ORM_ACCESS_MODE, "models": models},
+            status=200,
+        )
+
+    @http.route(
+        "/styd_bridge/v1/models/<model>/fields",
+        type="http",
+        auth="public",
+        methods=["GET"],
+        csrf=False,
+    )
+    def bridge_model_fields(self, model, **kwargs):
+        access = self._check_bridge_access()
+        if not access["ok"]:
+            return access["response"]
+
+        orm = self._get_orm()
+        try:
+            fields = orm.orm_model_fields(model)
+        except StydOrmError as exc:
+            return self._error_response(exc.code, exc.message, status=400)
+        except Exception as exc:
+            _logger.warning(
+                "STYD bridge: fields failed (error_type=%s)", type(exc).__name__
+            )
+            return self._error_response("orm_error", "Failed to read fields.", status=500)
+
+        return self._json_response(
+            {"ok": True, "access_mode": ORM_ACCESS_MODE, "model": model, "fields": fields},
+            status=200,
+        )
+
+    # Odoo 15 compatibility: the POST ORM routes are type="http" (same as 16.0+).
+    # Odoo 15's legacy HTTP framework routes any request whose Content-Type is
+    # application/json through its JSON-RPC dispatcher, which cannot return the plain
+    # {"ok": true, ...} contract — a type="http" route is rejected ("request of type
+    # 'json'") and a type="json" route wraps (and even str()s) the response into a
+    # JSON-RPC envelope. So STYD sends the bridge POST body with Content-Type
+    # text/plain, which keeps Odoo 15 on the plain-HTTP dispatcher; the handler reads
+    # the raw body via _parse_json_body. This is transparent to Odoo 16-19, whose
+    # type="http" handlers also read the raw body and ignore the request Content-Type.
+    @http.route(
+        "/styd_bridge/v1/search-read",
+        type="http",
+        auth="public",
+        methods=["POST"],
+        csrf=False,
+    )
+    def bridge_search_read(self, **kwargs):
+        access = self._check_bridge_access()
+        if not access["ok"]:
+            return access["response"]
+
+        body = self._parse_json_body()
+        if body is None:
+            return self._error_response(
+                "invalid_json", "Request body must be a valid JSON object.", status=400
+            )
+
+        model = body.get("model")
+        orm = self._get_orm()
+        try:
+            result = orm.orm_search_read(
+                model=model,
+                domain=body.get("domain"),
+                fields=body.get("fields"),
+                limit=body.get("limit"),
+                offset=body.get("offset"),
+                order=body.get("order"),
+            )
+        except StydOrmError as exc:
+            return self._error_response(exc.code, exc.message, status=400)
+        except Exception as exc:
+            _logger.warning(
+                "STYD bridge: search-read failed (error_type=%s)", type(exc).__name__
+            )
+            return self._error_response("orm_error", "Query failed.", status=500)
+
+        payload = {"ok": True, "access_mode": ORM_ACCESS_MODE, "model": model}
+        payload.update(result)
+        return self._json_response(payload, status=200)
+
+    # type="http" — see the Odoo 15 compatibility note on bridge_search_read.
+    @http.route(
+        "/styd_bridge/v1/read-group",
+        type="http",
+        auth="public",
+        methods=["POST"],
+        csrf=False,
+    )
+    def bridge_read_group(self, **kwargs):
+        access = self._check_bridge_access()
+        if not access["ok"]:
+            return access["response"]
+
+        body = self._parse_json_body()
+        if body is None:
+            return self._error_response(
+                "invalid_json", "Request body must be a valid JSON object.", status=400
+            )
+
+        model = body.get("model")
+        orm = self._get_orm()
+        try:
+            result = orm.orm_read_group(
+                model=model,
+                domain=body.get("domain"),
+                group_by=body.get("group_by"),
+                aggregates=body.get("aggregates"),
+                limit=body.get("limit"),
+                order=body.get("order"),
+            )
+        except StydOrmError as exc:
+            return self._error_response(exc.code, exc.message, status=400)
+        except Exception as exc:
+            _logger.warning(
+                "STYD bridge: read-group failed (error_type=%s)", type(exc).__name__
+            )
+            return self._error_response("orm_error", "Query failed.", status=500)
+
+        payload = {"ok": True, "access_mode": ORM_ACCESS_MODE, "model": model}
+        payload.update(result)
+        return self._json_response(payload, status=200)
