@@ -5,6 +5,7 @@
     "category": "Tools",
     "author": "Speak To Your Database",
     "website": "https://speaktoyourdatabase.com",
+    "images": ["static/description/banner.png"],
     "license": "LGPL-3",
     "depends": ["base"],
     "data": [
