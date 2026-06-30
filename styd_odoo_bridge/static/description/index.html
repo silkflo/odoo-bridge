@@ -10,8 +10,7 @@
 
       <p class="oe_mt32">
         Ask business questions in plain language and get answers from your live Odoo data. Check customers, sales,
-        products, stock, purchase orders, invoices, vendor bills, CRM, and opportunities without giving away direct
-        database access.
+        products, stock, purchase orders, invoices, CRM, and projects without giving away direct database access.
       </p>
 
       <p>
@@ -27,7 +26,6 @@
         <strong>External Speak To Your Database service required</strong>
       </p>
     </div>
-
   </div>
 </section>
 
@@ -44,8 +42,7 @@
           <tr>
             <td><strong>Ask in plain language</strong><br />Use questions like total sales, low stock, unpaid invoices,
               or recent purchase orders.</td>
-            <td><strong>Read live Odoo data</strong><br />Answers come from supported Odoo records through the Odoo ORM.
-            </td>
+            <td><strong>Read live Odoo data</strong><br />Answers come from supported Odoo records through the Odoo ORM.</td>
             <td><strong>Keep access controlled</strong><br />No direct database password, no SQL sent to Odoo, and no
               write path.</td>
           </tr>
@@ -90,12 +87,11 @@
     <div class="oe_span12 text-center">
       <h2>Connect it in Speak To Your Database</h2>
       <p>
-        After the bridge is enabled in Odoo, connect it in Speak To Your Database using the Odoo base URL and bridge
-        token.
+        After the bridge is enabled in Odoo, open <strong>Settings &rarr; Connections</strong> in Speak To Your
+        Database and connect it using the Odoo base URL and bridge token.
       </p>
       <div class="oe_demo oe_picture oe_screenshot" style="max-width: 1100px; margin: 32px auto;">
-        <img src="images/styd-odoo-bridge-connected.png"
-          alt="Odoo bridge connected successfully in Speak To Your Database"
+        <img src="images/styd-odoo-bridge-connected.png" alt="Odoo bridge connected successfully in Speak To Your Database"
           style="width: 100%; height: auto; border-radius: 8px;" />
       </div>
     </div>
@@ -111,8 +107,7 @@
         purchase orders, and stock levels.
       </p>
       <div class="oe_demo oe_picture oe_screenshot" style="max-width: 1100px; margin: 32px auto;">
-        <img src="images/bridge-total-sales-answer.png"
-          alt="Speak To Your Database answer showing total sales from Odoo"
+        <img src="images/bridge-total-sales-answer.png" alt="Speak To Your Database answer showing total sales from Odoo"
           style="width: 100%; height: auto; border-radius: 8px;" />
       </div>
     </div>
@@ -144,7 +139,6 @@
         <li><strong>No direct database credentials:</strong> access is done through a bridge token, never your database
           password.</li>
         <li><strong>Token-based authentication:</strong> the token can be rotated or disabled in Odoo.</li>
-        <li><strong>Hash-at-rest:</strong> Odoo stores only a non-reversible token hash.</li>
         <li><strong>Allow-listed models:</strong> only curated business models are exposed for supported access.</li>
         <li><strong>Filtered fields:</strong> sensitive security, credential, attachment, and configuration fields are
           excluded.</li>
@@ -179,11 +173,11 @@
           </tr>
           <tr>
             <td>CRM leads and opportunities</td>
-            <td>Company information</td>
+            <td>Projects and tasks</td>
           </tr>
           <tr>
-            <td>User directory</td>
-            <td>Access metadata</td>
+            <td>Company information</td>
+            <td>User directory and access metadata</td>
           </tr>
         </tbody>
       </table>
@@ -231,8 +225,8 @@
       </ol>
       <p>
         The Odoo Apps marketplace provides the module package. Installation still follows the standard third-party
-        module workflow in Odoo. Odoo Online hosted on odoo.com is not supported because custom server modules cannot be
-        installed there.
+        module workflow in Odoo. Odoo Online hosted on odoo.com is not supported because custom server modules cannot
+        be installed there.
       </p>
     </div>
   </div>
@@ -243,7 +237,8 @@
     <div class="oe_span12">
       <h2>Version support</h2>
       <p>
-        This package is for <strong>Odoo 19.0</strong> self-hosted and Odoo.sh environments.
+        This package is for <strong>Odoo 19.0</strong> self-hosted and Odoo.sh environments. Validated bridge
+        packages are available for Odoo 15.0, 16.0, 17.0, 18.0, and 19.0.
       </p>
       <p>
         Use the package matching your Odoo major version. Do not install a bridge package built for one Odoo major
