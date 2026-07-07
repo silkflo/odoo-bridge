@@ -54,6 +54,7 @@ ORM_MODEL_ALLOWLIST = frozenset({
     "stock.picking",
     "stock.picking.type",
     "stock.warehouse",
+    "stock.warehouse.orderpoint",
     "stock.lot",
 
     # Purchase
