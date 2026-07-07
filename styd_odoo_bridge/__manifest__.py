@@ -1,10 +1,11 @@
 {
     "name": "Speak To Your Database — Secure Odoo AI Connector",
-    "version": "19.0.0.7.0",
+    "version": "19.0.0.8.0",
     "summary": "Secure read-only connector for Speak To Your Database.",
     "category": "Tools",
     "author": "Speak To Your Database",
     "website": "https://speaktoyourdatabase.com",
+    "live_test_url": "https://speaktoyourdatabase.com/demo",
     "images": ["static/description/banner.png"],
     "license": "LGPL-3",
     "depends": ["base"],
@@ -15,6 +16,6 @@
         "views/bridge_status_views.xml",
         "views/bridge_setup_views.xml",
     ],
-     "installable": True,
+    "installable": True,
     "application": True,
 }
