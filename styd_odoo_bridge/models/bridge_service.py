@@ -3,12 +3,14 @@ from datetime import datetime, timezone
 
 from odoo import models, release
 
+from . import bridge_tz
+
 
 class StydOdooBridgeService(models.AbstractModel):
     _name = "styd.odoo.bridge.service"
     _description = "Speak To Your Database Bridge Service"
 
-    BRIDGE_VERSION = "0.2.0"
+    BRIDGE_VERSION = "0.3.0"
 
     SNAPSHOT_MODELS = [
         "account.move",
@@ -277,6 +279,20 @@ class StydOdooBridgeService(models.AbstractModel):
     def _get_icp(self):
         return self.env["ir.config_parameter"].sudo()
 
+    def _icp_get(self, key, default=""):
+        """Read a config parameter as a string (Odoo 20 replaced get_param with get_str)."""
+        icp = self._get_icp()
+        if hasattr(icp, "get_str"):
+            return icp.get_str(key, default)
+        return icp.get_param(key, default=default)
+
+    def _icp_set(self, key, value):
+        """Write a config parameter; False clears it."""
+        icp = self._get_icp()
+        if hasattr(icp, "set_str"):
+            return icp.set_str(key, value)
+        return icp.set_param(key, value)
+
     def _get_bridge_enabled(self):
         raw = self._get_icp().get_param("styd_odoo_bridge.enabled", default="False")
         return str(raw).lower() in ("1", "true", "yes", "on")
@@ -305,6 +321,24 @@ class StydOdooBridgeService(models.AbstractModel):
     def _has_legacy_plaintext_token(self):
         """True if a legacy plaintext token is still stored (rotation advised)."""
         return bool(self._get_bridge_token())
+
+    def _migrate_legacy_token_to_hash(self):
+        """Move a legacy plaintext bridge token to hash-at-rest storage, in place.
+
+        Called by the module's post-migrate script. Idempotent. Speak To Your
+        Database keeps sending the same raw token and the controller compares
+        its SHA-256 with the stored hash, so live connections keep working. If
+        a hash is already stored it is the live credential (the controller
+        prefers it), so the stale plaintext is only cleared. Returns True when
+        something changed. Never logs or returns the token.
+        """
+        legacy = self._get_bridge_token()
+        if not legacy:
+            return False
+        if not self._get_bridge_token_hash():
+            self._icp_set("styd_odoo_bridge.token_hash", self._hash_token(legacy))
+        self._icp_set("styd_odoo_bridge.token", False)
+        return True
 
     def _get_connector_owner_user_id(self):
         raw = self._get_icp().get_param("styd_odoo_bridge.connector_owner_user_id", default="")
@@ -337,6 +371,27 @@ class StydOdooBridgeService(models.AbstractModel):
     def _get_database_uuid(self):
         return self._get_icp().get_param("database.uuid", default="") or None
 
+    def _get_bridge_tz(self):
+        """IANA time zone the bridge reports and applies with tz_mode="company".
+
+        Odoo has no company time zone field, so this uses, in order: the
+        connector owner's time zone, the time zone of the owner's company
+        partner, the main company partner's time zone, then UTC.
+        """
+        candidates = []
+        user_id = self._get_connector_owner_user_id()
+        if user_id:
+            user = self.env["res.users"].sudo().browse(user_id)
+            if user.exists():
+                candidates.append(user.tz)
+                candidates.append(user.company_id.partner_id.tz)
+        main_company = self.env["res.company"].sudo().search([], order="id", limit=1)
+        candidates.append(main_company.partner_id.tz)
+        for name in candidates:
+            if name and bridge_tz.is_valid_tz(name):
+                return name
+        return "UTC"
+
     def _get_odoo_version(self):
         return getattr(release, "version", None)
 
@@ -367,6 +422,7 @@ class StydOdooBridgeService(models.AbstractModel):
             "security_snapshot_v1",
             "odoo_user_directory_v1",
             "odoo_capability_snapshot_v1",
+            "tz_aware_v1",
         ]
 
     def _get_group_xmlid_map(self, groups):
@@ -793,6 +849,7 @@ class StydOdooBridgeService(models.AbstractModel):
             "odoo_series": self._get_odoo_series(),
             "edition": self._get_edition(),
             "multi_company_enabled": self.env["res.company"].sudo().search_count([]) > 1,
+            "timezone": self._get_bridge_tz(),
         }
 
     def _build_business_capability_snapshot(self, installed_modules):
@@ -878,6 +935,7 @@ class StydOdooBridgeService(models.AbstractModel):
             "edition": self._get_edition(),
             "database_uuid": self._get_database_uuid(),
             "server_time_utc": self._utc_now_iso(),
+            "timezone": self._get_bridge_tz(),
             "supported_features": self.get_supported_features(),
         }
 
@@ -932,6 +990,7 @@ class StydOdooBridgeService(models.AbstractModel):
                 "odoo_version": self._get_odoo_version(),
                 "odoo_series": self._get_odoo_series(),
                 "edition": self._get_edition(),
+                "timezone": self._get_bridge_tz(),
             },
             "installed_modules": installed_modules,
             "available_models": available_models,
