@@ -10,10 +10,11 @@ The bridge is **read-only**. It uses the Odoo ORM, sends **no SQL to Odoo**, and
 
 ## Supported Odoo versions
 
-Validated bridge packages are available for **Odoo 15.0, 16.0, 17.0, 18.0, and 19.0**, for self-hosted Odoo and Odoo.sh. Install the package matching your Odoo major version.
+Bridge packages are available for **Odoo 15.0, 16.0, 17.0, 18.0, 19.0, and 20.0**, for self-hosted Odoo and Odoo.sh. Install the package matching your Odoo major version.
 
 | Odoo version | Bridge module folder    | Status                   | Hosting               |
 | ------------ | ----------------------- | ------------------------ | --------------------- |
+| Odoo 20.0    | `20.0/styd_odoo_bridge` | New bridge package       | Self-hosted / Odoo.sh |
 | Odoo 19.0    | `19.0/styd_odoo_bridge` | Validated bridge package | Self-hosted / Odoo.sh |
 | Odoo 18.0    | `18.0/styd_odoo_bridge` | Validated bridge package | Self-hosted / Odoo.sh |
 | Odoo 17.0    | `17.0/styd_odoo_bridge` | Validated bridge package | Self-hosted / Odoo.sh |
@@ -23,7 +24,7 @@ Validated bridge packages are available for **Odoo 15.0, 16.0, 17.0, 18.0, and 1
 > ⚠️ **Install the package matching your Odoo major version.**
 > Each bridge package is built for one Odoo major version. Do not install a bridge package built for one Odoo major version on another — for example, do not install the Odoo 19.0 package on Odoo 18.0, or the Odoo 18.0 package on Odoo 17.0.
 
-> **Odoo Online is not supported**, because custom server modules cannot be installed there.
+> **Odoo Online (Custom plan): use an API key.** Odoo Online (odoo.com) cannot install custom server modules, so this module cannot run there. On the Custom plan, connect Odoo Online to Speak To Your Database with an Odoo API key instead — no module needed.
 
 ---
 
@@ -31,21 +32,21 @@ Validated bridge packages are available for **Odoo 15.0, 16.0, 17.0, 18.0, and 1
 
 ### Self-hosted Odoo or Odoo.sh (supported)
 
-For Odoo 15.0, 16.0, 17.0, 18.0, and 19.0 on self-hosted Odoo or Odoo.sh, use the Speak To Your Database Odoo Bridge module.
+For Odoo 15.0, 16.0, 17.0, 18.0, 19.0, and 20.0 on self-hosted Odoo or Odoo.sh, you can use the Speak To Your Database Odoo Bridge module (or an Odoo API key, see below).
 
 1. Install the bridge package matching your Odoo major version — from the Odoo Apps marketplace, or by manual GitHub installation for self-hosted and Odoo.sh deployments, development, and review.
-2. Configure the bridge in Odoo: enable it, choose the connector owner, and generate a token.
+2. Configure the bridge in Odoo under **Speak To Your Database → Connection Setup**: enable it, choose the connector owner, and generate a token.
 3. Connect it in Speak To Your Database under [Settings → Connections](https://speaktoyourdatabase.com/settings?tab=connections).
 
 The bridge is read-only: no SQL is sent to Odoo, and there is no write path — no create, update, delete, or business actions. An external Speak To Your Database account and service connection is required.
 
 ---
 
-### Odoo Online (not supported)
+### Odoo Online (Custom plan): use an API key
 
-The bridge is **not supported** on Odoo Online, because custom Python server modules cannot be installed there.
+This module cannot be installed on Odoo Online (odoo.com), because custom Python server modules cannot be installed there.
 
-If you are unsure what is possible for your Odoo hosting plan, contact us.
+On the Custom plan, connect Odoo Online with an **Odoo API key** instead — no module needed. It also works on Odoo.sh and on-premise. With an API key, everyone in your Speak To Your Database workspace sees what that one Odoo user can see; the bridge module is for teams who want each person linked to their own Odoo user and a narrower data surface.
 
 ---
 
@@ -114,6 +115,7 @@ Use the folder matching your Odoo major version.
 Examples:
 
 ```text
+Odoo 20.0 → 20.0/styd_odoo_bridge
 Odoo 19.0 → 19.0/styd_odoo_bridge
 Odoo 18.0 → 18.0/styd_odoo_bridge
 Odoo 17.0 → 17.0/styd_odoo_bridge
@@ -123,7 +125,7 @@ Odoo 15.0 → 15.0/styd_odoo_bridge
 
 ### Recommended manual install from GitHub
 
-Replace `19.0` with your Odoo major version. Validated bridge packages are available for Odoo 15.0, 16.0, 17.0, 18.0, and 19.0 — use the package matching your Odoo major version.
+Replace `19.0` with your Odoo major version. Bridge packages are available for Odoo 15.0, 16.0, 17.0, 18.0, 19.0, and 20.0 — use the package matching your Odoo major version.
 
 ```bash
 cd /tmp
@@ -378,6 +380,10 @@ Speak To Your Database → Connection Setup
 5. Copy the token shown once. It is displayed a single time — store it securely.
 6. Save configuration.
 
+The token is managed only on the **Connection Setup** page, on every Odoo version. Odoo stores only its SHA-256 hash; the Settings page shows whether a token is configured but never the token itself. Use `Revoke Token` to clear it, which also disables the bridge.
+
+> **Upgrading from an earlier bridge release (0.9.x or older):** earlier 15.0–18.0 packages stored the token in plain text in Settings. Upgrading the module hashes that token in place automatically, so your existing Speak To Your Database connection keeps working with the same token — nothing to re-enter. After the upgrade the token can no longer be read back from Odoo; rotate it if you need a new copy.
+
 If the bridge is not enabled and saved, Speak To Your Database may receive:
 
 ```json
@@ -413,16 +419,18 @@ Expected response:
 ```json
 {
   "ok": true,
-  "bridge_version": "0.2.0",
+  "bridge_version": "0.3.0",
   "odoo_version": "19.0-20260421",
   "odoo_series": "19.0",
   "edition": "community",
   "database_uuid": "...",
   "server_time_utc": "...",
+  "timezone": "Europe/Paris",
   "supported_features": [
     "security_snapshot_v1",
     "odoo_user_directory_v1",
-    "odoo_capability_snapshot_v1"
+    "odoo_capability_snapshot_v1",
+    "tz_aware_v1"
   ]
 }
 ```
@@ -501,7 +509,7 @@ Expected response includes:
 
 ```json
 {
-  "bridge_version": "0.2.0",
+  "bridge_version": "0.3.0",
   "snapshot_version": 1,
   "generated_at_utc": "...",
   "users": [
@@ -538,7 +546,7 @@ Expected response includes:
 
 ```json
 {
-  "bridge_version": "0.2.0",
+  "bridge_version": "0.3.0",
   "snapshot_version": 1,
   "instance": {
     "odoo_version": "...",
@@ -653,21 +661,18 @@ If bridge answers look inconsistent:
 
 ### Odoo Online
 
-Odoo Online does not allow installation of custom server modules, so the bridge cannot be installed there.
-
-A direct database connection is usually unavailable on Odoo Online as well.
-
-If you are unsure about your hosting, contact us.
+Odoo Online does not allow installation of custom server modules, so the bridge cannot be installed there. On the Custom plan, connect it with an Odoo API key instead — no module needed.
 
 ---
 
 ## Security notes
 
-* Validated bridge packages are available for Odoo 15.0, 16.0, 17.0, 18.0, and 19.0 for self-hosted Odoo and Odoo.sh. Install the package matching your Odoo major version.
+* Bridge packages are available for Odoo 15.0, 16.0, 17.0, 18.0, 19.0, and 20.0 for self-hosted Odoo and Odoo.sh. Install the package matching your Odoo major version.
 * An external Speak To Your Database account and service connection is required.
 * The current bridge access model is company-scoped through the connector owner. Exact per-user record-rule parity is not guaranteed yet.
 * The bridge is read-only: it uses the Odoo ORM, sends no SQL to Odoo, and never writes, creates, updates, or deletes records.
-* The bridge records a read-only access log (audit trail) of bridge requests in Odoo, storing only a non-reversible token fingerprint — never the raw token or business data.
+* On Odoo 17.0 and later, the bridge records a read-only access log (audit trail) of bridge requests in Odoo (**Speak To Your Database → Access Logs**), storing only a non-reversible token fingerprint — never the raw token or business data.
+* The bridge token is stored only as a SHA-256 hash (hash-at-rest) on every Odoo version.
 * Use a strong bridge token, store it securely, and use HTTPS in production.
 * The bridge should be installed only by an Odoo administrator or trusted developer.
 * The bridge exposes metadata and supported read-only Odoo access used for security and planning, not uncontrolled database access.

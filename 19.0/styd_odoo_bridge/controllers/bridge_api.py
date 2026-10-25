@@ -148,13 +148,11 @@ class StydBridgeApi(http.Controller):
     # Access control
     # ------------------------------------------------------------------
     def _check_bridge_access(self, endpoint):
-        icp = request.env["ir.config_parameter"].sudo()
+        service = request.env["styd.odoo.bridge.service"].sudo()
 
-        service = request.env["styd.odoo.bridge.service"]
-
-        enabled = icp.get_param("styd_odoo_bridge.enabled", default="False")
-        expected_hash = icp.get_param("styd_odoo_bridge.token_hash", default="") or ""
-        legacy_token = icp.get_param("styd_odoo_bridge.token", default="") or ""
+        enabled = service._icp_get("styd_odoo_bridge.enabled", "False")
+        expected_hash = service._get_bridge_token_hash()
+        legacy_token = service._get_bridge_token()
 
         if str(enabled).lower() not in ("1", "true", "yes", "on"):
             self._audit_log(
@@ -499,6 +497,8 @@ class StydBridgeApi(http.Controller):
                 limit=body.get("limit"),
                 offset=body.get("offset"),
                 order=body.get("order"),
+                tz=body.get("tz"),
+                tz_mode=body.get("tz_mode"),
             )
         except StydOrmError as exc:
             self._audit_log(endpoint, "denied", exc.code, 400, "model=%s" % str(model)[:64])
@@ -541,6 +541,8 @@ class StydBridgeApi(http.Controller):
                 aggregates=body.get("aggregates"),
                 limit=body.get("limit"),
                 order=body.get("order"),
+                tz=body.get("tz"),
+                tz_mode=body.get("tz_mode"),
             )
         except StydOrmError as exc:
             self._audit_log(endpoint, "denied", exc.code, 400, "model=%s" % str(model)[:64])

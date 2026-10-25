@@ -499,6 +499,8 @@ class StydBridgeApi(http.Controller):
                 limit=body.get("limit"),
                 offset=body.get("offset"),
                 order=body.get("order"),
+                tz=body.get("tz"),
+                tz_mode=body.get("tz_mode"),
             )
         except StydOrmError as exc:
             self._audit_log(endpoint, "denied", exc.code, 400, "model=%s" % str(model)[:64])
@@ -541,6 +543,8 @@ class StydBridgeApi(http.Controller):
                 aggregates=body.get("aggregates"),
                 limit=body.get("limit"),
                 order=body.get("order"),
+                tz=body.get("tz"),
+                tz_mode=body.get("tz_mode"),
             )
         except StydOrmError as exc:
             self._audit_log(endpoint, "denied", exc.code, 400, "model=%s" % str(model)[:64])

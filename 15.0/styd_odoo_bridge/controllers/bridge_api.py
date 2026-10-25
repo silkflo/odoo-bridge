@@ -1,3 +1,4 @@
+import hmac
 import json
 import logging
 
@@ -59,8 +60,11 @@ class StydBridgeApi(http.Controller):
     def _check_bridge_access(self):
         icp = request.env["ir.config_parameter"].sudo()
 
+        service = request.env["styd.odoo.bridge.service"]
+
         enabled = icp.get_param("styd_odoo_bridge.enabled", default="False")
-        expected_token = icp.get_param("styd_odoo_bridge.token", default="")
+        expected_hash = icp.get_param("styd_odoo_bridge.token_hash", default="") or ""
+        legacy_token = icp.get_param("styd_odoo_bridge.token", default="") or ""
 
         if str(enabled).lower() not in ("1", "true", "yes", "on"):
             return {
@@ -74,7 +78,7 @@ class StydBridgeApi(http.Controller):
 
         provided_token = self._extract_bearer_token()
 
-        if not expected_token:
+        if not expected_hash and not legacy_token:
             return {
                 "ok": False,
                 "response": self._error_response(
@@ -84,7 +88,23 @@ class StydBridgeApi(http.Controller):
                 ),
             }
 
-        if not provided_token or provided_token != expected_token:
+        # Constant-time comparison to avoid leaking the token via timing.
+        # Prefer the hashed token (hash-at-rest); fall back to a legacy
+        # plaintext token for backward compatibility until it is migrated.
+        token_ok = False
+        if provided_token:
+            if expected_hash:
+                token_ok = hmac.compare_digest(
+                    service._hash_token(provided_token).encode("utf-8"),
+                    expected_hash.encode("utf-8"),
+                )
+            elif legacy_token:
+                token_ok = hmac.compare_digest(
+                    provided_token.encode("utf-8"),
+                    legacy_token.encode("utf-8"),
+                )
+
+        if not token_ok:
             return {
                 "ok": False,
                 "response": self._error_response(
@@ -240,7 +260,7 @@ class StydBridgeApi(http.Controller):
     # STYD Data Guide support).
     #
     # Same routes, response shapes, allowlist, field-filtering and read-only
-    # behavior as 16.0. They reuse 15.0's existing access control (plaintext
+    # behavior as 16.0. They reuse 15.0's existing access control (bridge
     # token via _check_bridge_access) and 15.0's existing _json_response (which
     # already uses the Odoo-15-compatible `response.status_code = status`
     # pattern). 15.0 has no audit-log model, so — exactly like the existing
@@ -366,6 +386,8 @@ class StydBridgeApi(http.Controller):
                 limit=body.get("limit"),
                 offset=body.get("offset"),
                 order=body.get("order"),
+                tz=body.get("tz"),
+                tz_mode=body.get("tz_mode"),
             )
         except StydOrmError as exc:
             return self._error_response(exc.code, exc.message, status=400)
@@ -408,6 +430,8 @@ class StydBridgeApi(http.Controller):
                 aggregates=body.get("aggregates"),
                 limit=body.get("limit"),
                 order=body.get("order"),
+                tz=body.get("tz"),
+                tz_mode=body.get("tz_mode"),
             )
         except StydOrmError as exc:
             return self._error_response(exc.code, exc.message, status=400)

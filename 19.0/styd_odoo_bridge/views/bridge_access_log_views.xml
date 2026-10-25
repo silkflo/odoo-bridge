@@ -72,7 +72,7 @@
                 <separator/>
 
                 <filter string="Today" name="filter_today"
-                        domain="[('create_date', '>=', datetime.datetime.combine(context_today(), datetime.time(0,0,0)))]"/>
+                        domain="[('create_date', '>=', datetime.datetime.combine(context_today(), datetime.time(0,0,0)).to_utc())]"/>
 
                 <separator/>
 

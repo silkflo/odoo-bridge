@@ -1,0 +1,213 @@
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12 text-center">
+      <img src="icon.png" alt="Speak To Your Database" style="max-width: 96px; height: auto; margin-bottom: 24px;" />
+      <h1 class="oe_slogan">Ask your Odoo data in plain words</h1>
+
+      <h3 class="oe_slogan">
+        From ChatGPT, Claude or the Speak To Your Database app.
+      </h3>
+
+      <p class="oe_mt32">
+        Real numbers from live Odoo data &mdash; sales, invoices, stock, CRM, projects.
+      </p>
+
+      <p>
+        <strong>Read-only</strong> |
+        <strong>This module: Odoo 20.0 &middot; available for Odoo 15 to 20</strong> |
+        <strong>Community and Enterprise</strong>
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12 text-center">
+      <a href="https://www.youtube.com/watch?v=PZffAbynuc0" target="_blank" rel="noopener">
+        <img src="images/video-thumbnail.png" alt="Watch the Speak To Your Database demo video on YouTube"
+          style="max-width: 800px; width: 100%; height: auto; border-radius: 8px;" />
+      </a>
+      <p>
+        <a href="https://www.youtube.com/watch?v=PZffAbynuc0" target="_blank" rel="noopener">Watch the demo on YouTube</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container oe_dark">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12">
+      <h2>Works in the AI app you already use</h2>
+      <ul>
+        <li><strong>ChatGPT:</strong> install the
+          <a href="https://chatgpt.com/plugins/plugin_asdk_app_6ac9e3034d488191bd0b9a624cb1f0ae" target="_blank" rel="noopener">Speak To Your Database plugin</a>.</li>
+        <li><strong>Claude:</strong> add the connector from
+          <a href="https://claude.ai/directory/speak-to-your-database" target="_blank" rel="noopener">Claude's directory</a>.</li>
+        <li>Also VS Code (GitHub Copilot), Le Chat, any app that supports remote MCP servers, or the
+          Speak To Your Database web app.</li>
+      </ul>
+      <p><strong>Example questions:</strong></p>
+      <ul>
+        <li>&ldquo;How much revenue did we make last month, compared with the month before?&rdquo;</li>
+        <li>&ldquo;Which customer invoices are overdue, and how much does each customer owe?&rdquo;</li>
+        <li>&ldquo;Show all sales orders grouped by customer and status, with the number of orders and the total amount.&rdquo;</li>
+        <li>&ldquo;Top 10 products by sales this year.&rdquo;</li>
+      </ul>
+      <p>
+        Answers state the period and the definition they used (for example, revenue = posted customer
+        invoices, excluding tax).
+      </p>
+      <div class="oe_demo oe_picture oe_screenshot" style="max-width: 1100px; margin: 32px auto;">
+        <img src="images/answer-in-chatgpt.png" alt="An Odoo question answered in ChatGPT with a table"
+          style="width: 100%; height: auto; border-radius: 8px;" />
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12">
+      <h2>Two ways to connect</h2>
+      <ol>
+        <li><strong>Odoo API key</strong> &mdash; fastest, no module to install. Works on Odoo Online (Custom plan), Odoo.sh and
+          on-premise. Everyone in your Speak To Your Database workspace sees what that one Odoo user can see.</li>
+        <li><strong>This module (the Bridge)</strong> &mdash; for teams who want each person linked to their own
+          Odoo user and a narrower data surface: only allow-listed models and fields, scoped to the company,
+          through a token you can rotate. No Odoo password or API key is stored. Odoo.sh and on-premise only.</li>
+      </ol>
+      <p>Both are read-only.</p>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container oe_dark">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12">
+      <h2>What this module does</h2>
+      <ul>
+        <li><strong>Read-only by design:</strong> it uses the Odoo ORM, sends no SQL, and has no write path.</li>
+        <li>Only allow-listed models and filtered fields are readable.</li>
+        <li>Scoped to the companies of the configured connector owner.</li>
+        <li>Each Speak To Your Database user is linked to an Odoo user.</li>
+        <li>Access through a token you generate, rotate or revoke on the <strong>Connection Setup</strong> page; the token is stored hashed.</li>
+        <li>Every request is recorded in an access log you can review in Odoo.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12">
+      <h2>Set up in 3 steps</h2>
+      <ol>
+        <li>Install the module.</li>
+        <li>In Odoo, open <strong>Connection Setup</strong> and generate a token.</li>
+        <li>In Speak To Your Database, add an Odoo connection and paste the token.</li>
+      </ol>
+      <div class="oe_demo oe_picture oe_screenshot" style="max-width: 1100px; margin: 32px auto;">
+        <img src="images/connection-setup.png" alt="Connection Setup page in Odoo"
+          style="width: 100%; height: auto; border-radius: 8px;" />
+      </div>
+      <div class="oe_demo oe_picture oe_screenshot" style="max-width: 1100px; margin: 32px auto;">
+        <img src="images/styd-connect.png" alt="Adding the Odoo connection in Speak To Your Database"
+          style="width: 100%; height: auto; border-radius: 8px;" />
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container oe_dark">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12 text-center">
+      <h2>Answers you can check</h2>
+      <p>
+        Each answer shows how it was found: which records were read, the filters, and the period. Long lists
+        are capped, and secrets are always hidden.
+      </p>
+      <div class="oe_demo oe_picture oe_screenshot" style="max-width: 1100px; margin: 32px auto;">
+        <img src="images/answer-evidence.png" alt="An answer with How STYD found this in the web app"
+          style="width: 100%; height: auto; border-radius: 8px;" />
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12">
+      <h2>Supported business areas</h2>
+      <table class="table table-bordered">
+        <tbody>
+          <tr>
+            <td>Customers and contacts</td>
+            <td>Sales orders and quotations</td>
+          </tr>
+          <tr>
+            <td>Products and variants</td>
+            <td>Inventory and stock levels</td>
+          </tr>
+          <tr>
+            <td>Purchase orders</td>
+            <td>Customer invoices and vendor bills</td>
+          </tr>
+          <tr>
+            <td>CRM leads and opportunities</td>
+            <td>Projects and tasks</td>
+          </tr>
+          <tr>
+            <td>Company information</td>
+            <td>User directory and access metadata</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Supported areas depend on the Odoo apps installed on your database.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container oe_dark">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12">
+      <h2>What is not supported</h2>
+      <ul>
+        <li>Odoo Online (odoo.com) cannot install this module. On the Custom plan, connect with an Odoo API key instead &mdash; no
+          module needed.</li>
+        <li>Creating, changing or deleting anything in Odoo.</li>
+        <li>Raw SQL.</li>
+        <li>Exact per-user record-rule parity: answers are scoped to the linked user and company, but not every
+          custom record rule is reproduced.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <div class="oe_span12 text-center">
+      <h2>Get started</h2>
+      <p>
+        Requires a Speak To Your Database account. Sign up and try it on sample data first.
+      </p>
+      <p>
+        Start at
+        <a href="https://speaktoyourdatabase.com" target="_blank" rel="noopener">speaktoyourdatabase.com</a>
+      </p>
+      <p>
+        <a href="https://speaktoyourdatabase.com/docs/mcp" target="_blank" rel="noopener">Docs</a>
+        &nbsp;|&nbsp;
+        <a href="https://speaktoyourdatabase.com/security" target="_blank" rel="noopener">Security</a>
+      </p>
+      <p>
+        Module: <code>styd_odoo_bridge</code> |
+        Version: <code>20.0.0.10.0</code> |
+        Odoo: <code>20.0</code> |
+        License: <code>LGPL-3</code>
+      </p>
+    </div>
+  </div>
+</section>

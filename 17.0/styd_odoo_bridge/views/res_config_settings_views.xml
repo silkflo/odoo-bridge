@@ -21,14 +21,14 @@
 
                         <setting
                             string="Speak To Your Database Bridge Token"
-                            help="Bearer token used by Speak To Your Database to authenticate to the Odoo bridge."
+                            help="The bridge token is generated and rotated from Speak To Your Database Bridge &gt; Connection Setup. It is stored only as a hash and is never shown here."
                             id="styd_bridge_token_setting"
                         >
-                            <field
-                                name="styd_bridge_token"
-                                password="True"
-                                placeholder="Paste the Speak To Your Database bridge token"
-                            />
+                            <field name="styd_bridge_token_configured" widget="boolean_toggle" readonly="1"/>
+                            <div class="text-muted">
+                                Generate, rotate, or revoke the token from
+                                <strong>Speak To Your Database Bridge &gt; Connection Setup</strong>.
+                            </div>
                         </setting>
 
                         <setting

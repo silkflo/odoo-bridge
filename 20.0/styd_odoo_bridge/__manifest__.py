@@ -1,0 +1,21 @@
+{
+    "name": "Speak To Your Database — AI Assistant for Odoo",
+    "version": "20.0.0.10.0",
+    "summary": "Ask your Odoo data questions in plain words, from ChatGPT, Claude or Speak To Your Database. Read-only answers on sales, invoices, stock, CRM and projects.",
+    "category": "Tools",
+    "author": "Speak To Your Database",
+    "website": "https://speaktoyourdatabase.com",
+    "live_test_url": "https://speaktoyourdatabase.com/demo",
+    "images": ["static/description/banner.png"],
+    "license": "LGPL-3",
+    "depends": ["base"],
+    "data": [
+        "security/ir.access.csv",
+        "views/res_config_settings_views.xml",
+        "views/bridge_access_log_views.xml",
+        "views/bridge_status_views.xml",
+        "views/bridge_setup_views.xml",
+    ],
+    "installable": True,
+    "application": True,
+}

@@ -1,7 +1,26 @@
+import datetime
+import itertools
+
+import babel.dates
+from dateutil.relativedelta import relativedelta
+
 from odoo import models
+from odoo.tools import get_lang
+
+from . import bridge_tz
 
 # Access mode reported on every ORM response (MVP policy: sudo + company scope).
 ORM_ACCESS_MODE = "sudo_company_scoped"
+
+# Odoo 20 replaced the public read_group(fields=..., lazy=...) API. When True the
+# bridge builds its groups from the private _read_group() through
+# _orm_read_group_rows(), which reproduces Odoo 19's read_group() output. On
+# 19.0 it stays False (the real read_group() is used) and the adapter is only
+# exercised by the shape-parity test.
+ORM_USE_PRIVATE_READ_GROUP = False
+
+# Datetime values in search-read records, when a tz is applied (tz_aware_v1).
+ORM_TZ_DATETIME_FORMAT = "iso8601_offset"
 
 # Read-only model allowlist for the bridge transport layer.
 #
@@ -388,6 +407,202 @@ class StydOdooBridgeOrm(models.AbstractModel):
             terms.append("%s %s" % (fname, direction))
         return ", ".join(terms) or None
 
+    # ------------------------------------------------------------------
+    # Opt-in time zone (tz_aware_v1). Without "tz" / "tz_mode" in the request
+    # nothing below runs and the bridge behaves exactly as before.
+    # ------------------------------------------------------------------
+    def _orm_resolve_tz(self, tz=None, tz_mode=None):
+        """Return the IANA time zone to apply, or None for legacy behaviour.
+
+        An explicit "tz" wins over "tz_mode"; "tz_mode": "company" uses the
+        bridge time zone reported by /health (connector owner, then company).
+        """
+        if tz in (None, "") and tz_mode in (None, ""):
+            return None
+        if tz not in (None, ""):
+            if not bridge_tz.is_valid_tz(tz):
+                raise StydOrmError("tz_invalid", "tz must be a valid IANA time zone name.")
+            return tz
+        if tz_mode != "company":
+            raise StydOrmError("tz_invalid", 'tz_mode must be "company".')
+        return self.env["styd.odoo.bridge.service"]._get_bridge_tz()
+
+    def _orm_localize_leaf(self, field, operator, value, tz):
+        """Rewrite one datetime leaf whose value is local time into UTC leaves.
+
+        Returns a list of domain elements (one leaf, or a small prefix-notation
+        expression). A date-only value means the whole local day, with the same
+        operator semantics Odoo uses for dates on datetime fields.
+        """
+        try:
+            parsed = bridge_tz.parse_datetime_value(value)
+        except ValueError:
+            raise StydOrmError("domain_invalid", "Invalid date value for %s." % _short(field))
+        if parsed is None or operator not in ("=", "!=", ">", "<", ">=", "<="):
+            return [(field, operator, value)]
+        moment, is_date = parsed
+
+        if not is_date:
+            if moment.tzinfo is not None:
+                utc = moment.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+            else:
+                utc = bridge_tz.local_to_utc(moment, tz)
+            return [(field, operator, bridge_tz.format_utc(utc))]
+
+        start = bridge_tz.format_utc(bridge_tz.local_to_utc(moment, tz))
+        end = bridge_tz.format_utc(bridge_tz.local_to_utc(moment + datetime.timedelta(days=1), tz))
+        if operator == ">=":
+            return [(field, ">=", start)]
+        if operator == "<":
+            return [(field, "<", start)]
+        if operator == ">":
+            return [(field, ">=", end)]
+        if operator == "<=":
+            return [(field, "<", end)]
+        if operator == "=":
+            return ["&", (field, ">=", start), (field, "<", end)]
+        # "!=": outside the day, or unset (Odoo's != also matches empty values).
+        return ["|", "|", (field, "=", False), (field, "<", start), (field, ">=", end)]
+
+    def _orm_localize_domain(self, meta, domain, tz):
+        if not tz or not domain:
+            return domain
+        out = []
+        for element in domain:
+            if isinstance(element, str):
+                out.append(element)
+                continue
+            field, operator, value = element
+            if meta[field].get("type") != "datetime":
+                out.append(element)
+                continue
+            out.extend(self._orm_localize_leaf(field, operator, value, tz))
+        return out
+
+    def _orm_localize_records(self, meta, records, fields, tz):
+        datetime_fields = [f for f in fields if meta.get(f, {}).get("type") == "datetime"]
+        if not tz or not datetime_fields:
+            return records
+        for record in records:
+            for fname in datetime_fields:
+                moment = bridge_tz.parse_server_datetime(record.get(fname))
+                if moment is not None:
+                    record[fname] = bridge_tz.utc_to_local(moment, tz).isoformat()
+        return records
+
+    def _orm_group_ranges(self, meta, raw, group_by, tz):
+        """Bucket bounds of date/datetime groups, as local ISO strings."""
+        ranges = {}
+        raw_ranges = raw.get("__range") or {}
+        for gb in group_by:
+            ftype = meta[gb].get("type")
+            if ftype not in ("date", "datetime"):
+                continue
+            bounds = None
+            for key, value in raw_ranges.items():
+                if key.split(":")[0] == gb:
+                    bounds = value
+                    break
+            if not bounds:
+                ranges[gb] = False
+                continue
+            if ftype == "date":
+                ranges[gb] = {"from": bounds.get("from"), "to": bounds.get("to")}
+                continue
+            converted = {}
+            for side in ("from", "to"):
+                moment = bridge_tz.parse_server_datetime(bounds.get(side))
+                converted[side] = bridge_tz.utc_to_local(moment, tz).isoformat() if moment else None
+            ranges[gb] = converted
+        return ranges
+
+    # ------------------------------------------------------------------
+    # Odoo 20 read_group adapter
+    # ------------------------------------------------------------------
+    def _orm_read_group_rows(self, model, domain, group_by, agg_specs, limit=None, order=None):
+        """Rows shaped like Odoo 19 read_group(..., lazy=False), from _read_group().
+
+        Mirrors BaseModel.read_group and _read_group_format_result of Odoo 19
+        for what the bridge allows: plain group_by fields (dates are grouped by
+        month), "field:func" aggregates and an order on those names.
+        """
+        annotated = {}
+        for gb in group_by:
+            ftype = model._fields[gb].type
+            annotated[gb] = "%s:month" % gb if ftype in ("date", "datetime") else gb
+        aggregates = {"__count": "__count"}
+        for spec in agg_specs:
+            aggregates[spec.split(":")[0]] = spec
+
+        if order:
+            terms = []
+            for term in order.split(","):
+                term = term.strip()
+                if not term:
+                    continue
+                fname, _sep, direction = term.partition(" ")
+                key = annotated.get(fname) or aggregates.get(fname) or fname
+                terms.append(("%s %s" % (key, direction.strip())).strip())
+            order_spec = ", ".join(terms)
+        else:
+            order_spec = ", ".join(annotated.values())
+
+        rows = model._read_group(
+            domain,
+            list(annotated.values()),
+            list(aggregates.values()),
+            limit=limit,
+            order=order_spec or None,
+        )
+
+        locale = get_lang(model.env).code
+        tz_name = model.env.context.get("tz")
+        tzinfo = bridge_tz.get_tzinfo(tz_name) if tz_name else None
+        out = []
+        for row in rows:
+            values = dict(zip(itertools.chain(annotated, aggregates), row))
+            for gb in group_by:
+                field = model._fields[gb]
+                value = values[gb]
+                if isinstance(value, models.BaseModel):
+                    values[gb] = (value.id, value.sudo().display_name) if value else False
+                elif field.type in ("date", "datetime"):
+                    if value and isinstance(value, (datetime.date, datetime.datetime)):
+                        range_start = value
+                        range_end = value + relativedelta(months=1)
+                        if field.type == "datetime":
+                            fmt = bridge_tz.SERVER_DATETIME_FORMAT
+                            if tzinfo is not None:
+                                range_start = bridge_tz.localize(range_start, tzinfo).astimezone(datetime.timezone.utc)
+                                range_end = bridge_tz.localize(range_end, tzinfo).astimezone(datetime.timezone.utc)
+                            label = babel.dates.format_datetime(
+                                range_start, format="MMMM yyyy", tzinfo=tzinfo, locale=locale,
+                            )
+                        else:
+                            fmt = "%Y-%m-%d"
+                            label = babel.dates.format_date(value, format="MMMM yyyy", locale=locale)
+                        values[gb] = label
+                        values.setdefault("__range", {})[gb] = {
+                            "from": range_start.strftime(fmt),
+                            "to": range_end.strftime(fmt),
+                        }
+                    elif not value:
+                        values.setdefault("__range", {})[gb] = False
+            out.append(values)
+        return out
+
+    def _orm_run_read_group(self, model, domain, group_by, agg_specs, limit=None, order=None):
+        if ORM_USE_PRIVATE_READ_GROUP:
+            return self._orm_read_group_rows(model, domain, group_by, agg_specs, limit=limit, order=order)
+        return model.read_group(
+            domain=domain,
+            fields=agg_specs,
+            groupby=group_by,
+            lazy=False,
+            limit=limit,
+            orderby=order,
+        )
+
     def orm_list_models(self):
         out = []
         for model_name in sorted(self.MODEL_ALLOWLIST):
@@ -429,7 +644,8 @@ class StydOdooBridgeOrm(models.AbstractModel):
             })
         return out
 
-    def orm_search_read(self, model, domain=None, fields=None, limit=None, offset=None, order=None):
+    def orm_search_read(self, model, domain=None, fields=None, limit=None, offset=None, order=None,
+                        tz=None, tz_mode=None):
         self._orm_check_model(model)
         base = self.env[model].sudo()
         meta = base.fields_get()
@@ -439,10 +655,14 @@ class StydOdooBridgeOrm(models.AbstractModel):
         valid_order = self._orm_validate_order(meta, order)
         resolved_limit = self._orm_resolve_limit(limit)
         resolved_offset = self._orm_resolve_offset(offset)
+        resolved_tz = self._orm_resolve_tz(tz, tz_mode)
+        valid_domain = self._orm_localize_domain(meta, valid_domain, resolved_tz)
 
         companies = self._orm_scope_companies()
         final_domain = self._orm_company_domain(model, companies) + valid_domain
         scoped = base.with_context(allowed_company_ids=companies.ids)
+        if resolved_tz:
+            scoped = scoped.with_context(tz=resolved_tz)
 
         records = scoped.search_read(
             domain=final_domain,
@@ -451,8 +671,9 @@ class StydOdooBridgeOrm(models.AbstractModel):
             limit=resolved_limit,
             order=valid_order,
         )
+        records = self._orm_localize_records(meta, records, safe_fields, resolved_tz)
         total = scoped.search_count(final_domain)
-        return {
+        result = {
             "records": records,
             "returned_count": len(records),
             "count": total,
@@ -460,8 +681,13 @@ class StydOdooBridgeOrm(models.AbstractModel):
             "offset": resolved_offset,
             "truncated": (resolved_offset + len(records)) < total,
         }
+        if resolved_tz:
+            result["tz"] = resolved_tz
+            result["datetime_format"] = ORM_TZ_DATETIME_FORMAT
+        return result
 
-    def orm_read_group(self, model, domain=None, group_by=None, aggregates=None, limit=None, order=None):
+    def orm_read_group(self, model, domain=None, group_by=None, aggregates=None, limit=None, order=None,
+                       tz=None, tz_mode=None):
         self._orm_check_model(model)
         base = self.env[model].sudo()
         meta = base.fields_get()
@@ -471,18 +697,22 @@ class StydOdooBridgeOrm(models.AbstractModel):
         valid_domain = self._orm_validate_domain(meta, domain)
         resolved_limit = self._orm_resolve_limit(limit)
         valid_order = self._orm_validate_group_order(order, valid_group_by, agg_names)
+        resolved_tz = self._orm_resolve_tz(tz, tz_mode)
+        valid_domain = self._orm_localize_domain(meta, valid_domain, resolved_tz)
 
         companies = self._orm_scope_companies()
         final_domain = self._orm_company_domain(model, companies) + valid_domain
         scoped = base.with_context(allowed_company_ids=companies.ids)
+        if resolved_tz:
+            scoped = scoped.with_context(tz=resolved_tz)
 
-        raw_groups = scoped.read_group(
-            domain=final_domain,
-            fields=agg_specs,
-            groupby=valid_group_by,
-            lazy=False,
+        raw_groups = self._orm_run_read_group(
+            scoped,
+            final_domain,
+            valid_group_by,
+            agg_specs,
             limit=resolved_limit,
-            orderby=valid_order,
+            order=valid_order,
         )
 
         groups = []
@@ -491,12 +721,17 @@ class StydOdooBridgeOrm(models.AbstractModel):
             for name in agg_names:
                 clean[name] = raw.get(name)
             clean["count"] = raw.get("__count")
+            if resolved_tz:
+                clean["ranges"] = self._orm_group_ranges(meta, raw, valid_group_by, resolved_tz)
             groups.append(clean)
 
-        return {
+        result = {
             "groups": groups,
             "group_by": valid_group_by,
             "aggregates": agg_specs,
             "returned_count": len(groups),
             "limit": resolved_limit,
         }
+        if resolved_tz:
+            result["tz"] = resolved_tz
+        return result

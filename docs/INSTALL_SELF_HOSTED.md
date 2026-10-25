@@ -8,10 +8,13 @@ This module enables a trusted security bridge between Odoo and Speak To Your Dat
 
 ## Supported environments
 
-- Self-hosted Odoo with server access
+- Self-hosted Odoo 15.0, 16.0, 17.0, 18.0, 19.0, or 20.0 with server access (use the module folder matching
+  your Odoo major version, e.g. `20.0/styd_odoo_bridge` for Odoo 20.0)
 - Custom addons path available
 - Odoo admin access
 - Developer mode available in the Odoo UI
+
+> **Odoo Online (Custom plan): use an API key.** Odoo Online (odoo.com) cannot install custom server modules, so this module cannot run there. On the Custom plan, connect Odoo Online to Speak To Your Database with an Odoo API key instead — no module needed.
 
 ## Module name
 
@@ -223,32 +226,22 @@ sudo systemctl restart odoo.service
 
 Replace `YOUR_DATABASE` with the target Odoo database name.
 
-## 6. Configure the module in Odoo
+## 6. Configure the module in Odoo (Connection Setup)
 
-Open **Settings** and search for `Speak To Your Database`.
+Open **Speak To Your Database → Connection Setup**.
 
-Configure:
+1. Set **Bridge Enabled** to allow the bridge endpoints to respond.
+2. Choose the **Connector Owner**: the Odoo user whose trusted scope will be used for the
+   connector-owner snapshot.
+3. Click **Save Settings**.
+4. Click **Generate Token** (or **Rotate Token** to replace an existing one) and copy the token shown.
+   It is displayed **once**; Odoo stores only its SHA-256 hash. You will paste it into Speak To Your
+   Database.
 
-- **Enable Speak To Your Database Bridge**
-- **Speak To Your Database Bridge Token**
-- **Speak To Your Database Connector Owner**
+**Revoke Token** clears the token and disables the bridge.
 
-Notes:
-
-- **Enable Speak To Your Database Bridge**
-  - turn this on to allow the bridge endpoints to respond
-
-- **Speak To Your Database Bridge Token**
-  - enter any secret string you choose
-  - use a long random value
-  - example:
-    - `styd-bridge-7f92c1b9-very-secret`
-  - you must use the exact same token later in Speak To Your Database
-
-- **Speak To Your Database Connector Owner**
-  - choose the Odoo user whose trusted scope will be used for the connector-owner snapshot
-
-Then save.
+**Settings → Speak To Your Database** shows the enable switch, the connector owner, and a read-only
+**Token Configured** indicator. The token itself is never shown or typed there.
 
 ## 7. Health check
 
@@ -286,7 +279,7 @@ Expected result:
 In the **workspace Odoo settings** in Speak To Your Database:
 
 - enter the Odoo base URL
-- enter the same bridge token you saved in Odoo
+- paste the bridge token generated in Connection Setup
 - enter the Odoo database name if required
 - run bridge sync
 
@@ -298,6 +291,11 @@ When the module code changes:
 sudo -u odoo /usr/bin/python3 /usr/bin/odoo --config /etc/odoo/odoo.conf -d YOUR_DATABASE -u styd_odoo_bridge --stop-after-init
 sudo systemctl restart odoo.service
 ```
+
+**Upgrading from an earlier bridge release (0.9.x or older):** earlier 15.0–18.0 packages stored the token
+in plain text in Settings. The upgrade hashes that token in place automatically, so your existing Speak To
+Your Database connection keeps working with the same token — nothing to re-enter. After the upgrade the
+token can no longer be read back from Odoo; rotate it in Connection Setup if you need a new copy.
 
 ## Uninstall
 
