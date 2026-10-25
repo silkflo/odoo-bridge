@@ -6,7 +6,7 @@
     "author": "Speak To Your Database",
     "website": "https://speaktoyourdatabase.com",
     "support": "contact@speaktoyourdatabase.com",
-    "live_test_url": "https://speaktoyourdatabase.com/demo?utm_source=odoo-apps",
+    "live_test_url": "https://speaktoyourdatabase.com/?utm_source=odoo-apps",
     "images": ["static/description/banner.png"],
     "license": "LGPL-3",
     "depends": ["base", "base_setup"],
