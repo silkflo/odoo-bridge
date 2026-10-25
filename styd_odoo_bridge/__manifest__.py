@@ -1,7 +1,7 @@
 {
-    "name": "Speak To Your Database - Secure Odoo AI Connector",
-    "version": "15.0.0.9.0",
-    "summary": "Secure read-only connector for Speak To Your Database.",
+    "name": "Speak To Your Database - AI Assistant for Odoo",
+    "version": "15.0.0.10.0",
+    "summary": "Ask your Odoo data questions in plain words, from ChatGPT, Claude or Speak To Your Database. Read-only answers on sales, invoices, stock, CRM and projects.",
     "category": "Tools",
     "author": "Speak To Your Database",
     "website": "https://speaktoyourdatabase.com",
@@ -12,6 +12,7 @@
     "data": [
         "security/ir.model.access.csv",
         "views/res_config_settings_views.xml",
+        "views/bridge_setup_views.xml",
     ],
     "installable": True,
     "application": True,
