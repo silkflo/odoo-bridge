@@ -1,7 +1,13 @@
+import ast
+import os
+
+from odoo.modules.module import get_module_path
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 
 from odoo.addons.styd_odoo_bridge.models.bridge_orm import StydOrmError
+
+EXPECTED_MANIFEST_VERSION = "20.0.0.10.0"
 
 
 @tagged("post_install", "-at_install")
@@ -33,8 +39,10 @@ class TestStydOrmBridge(TransactionCase):
         self.assertNotIn("ir.model.access", names)
         # base-only models that ARE allowlisted and installed appear.
         self.assertIn("res.partner", names)
-        self.assertIn("res.users", names)
         self.assertIn("res.company", names)
+        # res.users is deliberately NOT allowlisted (see bridge_orm.py); user
+        # data is served only by the dedicated user-directory endpoints.
+        self.assertNotIn("res.users", names)
         # Optional-app models that are NOT installed in the base-only test DB are
         # silently skipped (graceful), so they must not appear in the listing.
         self.assertNotIn("sale.order", names)
@@ -117,31 +125,31 @@ class TestStydOrmBridge(TransactionCase):
             self.orm.orm_search_read("res.partner", fields=["name"], limit=999)
         self.assertEqual(cm.exception.code, "limit_exceeded")
 
-    # 8. read-group works
+    # 8. read-group works (company_type is not stored, so group on the stored "type")
     def test_08_read_group_partner(self):
-        self.env["res.partner"].create({"name": "STYD G1", "company_type": "company"})
+        self.env["res.partner"].create({"name": "STYD G1", "is_company": True})
         result = self.orm.orm_read_group(
             "res.partner",
             domain=[],
-            group_by=["company_type"],
+            group_by=["type"],
             aggregates=[],
         )
         self.assertIn("groups", result)
-        self.assertEqual(result["group_by"], ["company_type"])
+        self.assertEqual(result["group_by"], ["type"])
         for g in result["groups"]:
             self.assertIn("count", g)
-            self.assertIn("company_type", g)
+            self.assertIn("type", g)
 
     # 9. read-group rejects unsafe aggregate/group fields
     def test_09_read_group_rejects_unsafe(self):
         with self.assertRaises(StydOrmError) as cm:
-            self.orm.orm_read_group("res.partner", group_by=["company_type"], aggregates=["name:sum"])
+            self.orm.orm_read_group("res.partner", group_by=["type"], aggregates=["name:sum"])
         self.assertEqual(cm.exception.code, "field_not_allowed")
         with self.assertRaises(StydOrmError) as cm2:
             self.orm.orm_read_group("res.partner", group_by=["password"], aggregates=[])
         self.assertEqual(cm2.exception.code, "field_not_allowed")
         with self.assertRaises(StydOrmError) as cm3:
-            self.orm.orm_read_group("res.partner", group_by=["company_type", "country_id", "email"], aggregates=[])
+            self.orm.orm_read_group("res.partner", group_by=["type", "country_id", "email"], aggregates=[])
         self.assertEqual(cm3.exception.code, "field_not_allowed")
 
     # order validation
@@ -267,12 +275,10 @@ class TestStydOrmBridge(TransactionCase):
         self.assertEqual(cmu.exception.code, "field_not_allowed")
 
     # 16. (req #1 + #5) allowlisted models that ARE installed can be requested,
-    #     and credential fields are never exposed -- incl. the newly-allowed
-    #     res.users / res.company alongside the long-supported res.partner.
+    #     and credential fields are never exposed. res.users stays blocked.
     def test_16_allowed_base_models_requestable(self):
         safe_fields = {
             "res.partner": ["name"],
-            "res.users": ["login", "name"],
             "res.company": ["name"],
         }
         for model_name, fnames in safe_fields.items():
@@ -284,10 +290,13 @@ class TestStydOrmBridge(TransactionCase):
                     self.assertNotIn(bad, low)
             result = self.orm.orm_search_read(model_name, fields=fnames, limit=1)
             self.assertIn("records", result)
-        # res.users: useful identity fields are exposed, secrets are stripped.
-        user_fields = {f["name"] for f in self.orm.orm_model_fields("res.users")}
-        self.assertIn("login", user_fields)
-        self.assertNotIn("password", user_fields)
+        # res.users is not readable through the generic ORM endpoints.
+        with self.assertRaises(StydOrmError) as cm:
+            self.orm.orm_model_fields("res.users")
+        self.assertEqual(cm.exception.code, "model_not_allowed")
+        with self.assertRaises(StydOrmError) as cm2:
+            self.orm.orm_search_read("res.users", fields=["login"], limit=1)
+        self.assertEqual(cm2.exception.code, "model_not_allowed")
 
     # 17. (req #3) a model that is allowlisted but whose Odoo app is NOT installed
     #     fails gracefully with `model_not_installed` (never a crash / 500), and
@@ -319,22 +328,23 @@ class TestStydOrmBridge(TransactionCase):
     #     Pinned on purpose: changing the bridge's data surface must be deliberate.
     def test_18_allowlist_contents_and_exclusions(self):
         expected = {
-            "res.partner", "res.company", "res.users",
-            "sale.order", "sale.order.line",
+            "res.partner", "res.company",
+            "sale.order", "sale.order.line", "sale.report",
             "account.move", "account.move.line", "account.payment",
-            "account.journal", "account.account", "account.tax",
+            "account.journal", "account.account", "account.tax", "account.payment.term",
             "product.template", "product.product", "product.category", "uom.uom",
             "stock.quant", "stock.location", "stock.move", "stock.move.line",
             "stock.picking", "stock.picking.type", "stock.warehouse",
+            "stock.warehouse.orderpoint", "stock.lot",
             "purchase.order", "purchase.order.line",
-            "crm.lead", "crm.stage", "crm.team",
-            "project.project", "project.task",
-            "mrp.production", "mrp.workorder", "mrp.bom", "mrp.bom.line",
+            "crm.lead", "crm.stage", "crm.team", "crm.tag",
+            "project.project", "project.task", "project.tags",
+            "mrp.production", "mrp.workorder", "mrp.bom", "mrp.bom.line", "mrp.routing",
             "maintenance.equipment", "maintenance.request", "maintenance.team",
         }
         self.assertEqual(set(self.orm.MODEL_ALLOWLIST), expected)
         forbidden = {
-            "ir.config_parameter", "ir.attachment", "mail.message", "mail.thread",
+            "res.users", "ir.config_parameter", "ir.attachment", "mail.message", "mail.thread",
             "res.groups", "ir.model.access", "ir.rule", "ir.module.module",
             "hr.employee", "auth_totp.device", "res.users.apikeys",
         }
@@ -357,7 +367,7 @@ class TestStydOrmBridge(TransactionCase):
         self.env["res.partner"].create({"name": "STYD RO Probe"})
         before = self.env["res.partner"].search_count([])
         self.orm.orm_search_read("res.partner", fields=["name"], limit=50)
-        self.orm.orm_read_group("res.partner", group_by=["company_type"], aggregates=[])
+        self.orm.orm_read_group("res.partner", group_by=["type"], aggregates=[])
         self.orm.orm_model_fields("res.partner")
         self.orm.orm_list_models()
         self.assertEqual(self.env["res.partner"].search_count([]), before)
@@ -368,7 +378,9 @@ class TestStydOrmBridge(TransactionCase):
         from odoo.addons.styd_odoo_bridge.controllers.bridge_api import StydBridgeApi
         routed = 0
         for attr_name in dir(StydBridgeApi):
-            routing = getattr(getattr(StydBridgeApi, attr_name), "routing", None)
+            method = getattr(StydBridgeApi, attr_name)
+            # Odoo 15 stores the route metadata on .routing, Odoo 16+ on .original_routing.
+            routing = getattr(method, "routing", None) or getattr(method, "original_routing", None)
             if not routing:
                 continue
             routed += 1
@@ -379,8 +391,9 @@ class TestStydOrmBridge(TransactionCase):
         # Guard against the routing metadata shape changing under us.
         self.assertGreaterEqual(routed, 8)
 
-    # 21. (req #6) the manifest version was bumped to 19.0.0.7.0.
+    # 21. the manifest carries this release's version.
     def test_21_manifest_version_bumped(self):
-        from odoo.modules.module import get_manifest
-        manifest = get_manifest("styd_odoo_bridge")
-        self.assertEqual(manifest.get("version"), "19.0.0.7.0")
+        path = os.path.join(get_module_path("styd_odoo_bridge"), "__manifest__.py")
+        with open(path, encoding="utf-8") as handle:
+            manifest = ast.literal_eval(handle.read())
+        self.assertEqual(manifest.get("version"), EXPECTED_MANIFEST_VERSION)

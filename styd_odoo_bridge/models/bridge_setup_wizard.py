@@ -93,18 +93,17 @@ class StydOdooBridgeSetupWizard(models.TransientModel):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _icp(self):
-        return self.env["ir.config_parameter"].sudo()
+    def _set_param(self, key, value):
+        self.env["styd.odoo.bridge.service"]._icp_set(key, value)
 
     def _persist_settings(self):
         """Persist enable/disable + connector owner from the wizard fields."""
         self.ensure_one()
-        icp = self._icp()
-        icp.set_param(
+        self._set_param(
             "styd_odoo_bridge.enabled",
             "True" if self.bridge_enabled else "False",
         )
-        icp.set_param(
+        self._set_param(
             "styd_odoo_bridge.connector_owner_user_id",
             str(self.connector_owner_user_id.id or ""),
         )
@@ -132,10 +131,9 @@ class StydOdooBridgeSetupWizard(models.TransientModel):
         the context for one-time display."""
         service = self.env["styd.odoo.bridge.service"]
         token = secrets.token_urlsafe(32)
-        icp = self._icp()
-        icp.set_param("styd_odoo_bridge.token_hash", service._hash_token(token))
+        self._set_param("styd_odoo_bridge.token_hash", service._hash_token(token))
         # Hash-at-rest: remove any legacy plaintext token now that a hash exists.
-        icp.set_param("styd_odoo_bridge.token", "")
+        self._set_param("styd_odoo_bridge.token", "")
         return self._reopen(generated_token=token)
 
     # ------------------------------------------------------------------
@@ -158,11 +156,10 @@ class StydOdooBridgeSetupWizard(models.TransientModel):
 
     def action_revoke_token(self):
         self.ensure_one()
-        icp = self._icp()
-        icp.set_param("styd_odoo_bridge.token_hash", "")
-        icp.set_param("styd_odoo_bridge.token", "")
+        self._set_param("styd_odoo_bridge.token_hash", "")
+        self._set_param("styd_odoo_bridge.token", "")
         # Revoking the token disables the bridge as a safe default.
-        icp.set_param("styd_odoo_bridge.enabled", "False")
+        self._set_param("styd_odoo_bridge.enabled", "False")
         return self._reopen()
 
     def action_open_bridge_status(self):

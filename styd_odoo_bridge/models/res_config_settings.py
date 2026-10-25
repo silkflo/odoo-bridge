@@ -35,11 +35,11 @@ class ResConfigSettings(models.TransientModel):
 
     def get_values(self):
         res = super().get_values()
-        icp = self.env["ir.config_parameter"].sudo()
+        service = self.env["styd.odoo.bridge.service"]
 
-        raw_connector_owner_user_id = icp.get_param(
+        raw_connector_owner_user_id = service._icp_get(
             "styd_odoo_bridge.connector_owner_user_id",
-            default="",
+            "",
         )
 
         connector_owner_user_id = False
@@ -51,7 +51,7 @@ class ResConfigSettings(models.TransientModel):
 
         res.update(
             styd_bridge_enabled=str(
-                icp.get_param("styd_odoo_bridge.enabled", default="False")
+                service._icp_get("styd_odoo_bridge.enabled", "False")
             ).lower() in ("1", "true", "yes", "on"),
             styd_bridge_connector_owner_user_id=connector_owner_user_id,
         )
@@ -59,16 +59,16 @@ class ResConfigSettings(models.TransientModel):
 
     def set_values(self):
         super().set_values()
-        icp = self.env["ir.config_parameter"].sudo()
+        service = self.env["styd.odoo.bridge.service"]
 
         # NOTE: the bridge token is intentionally NOT written here anymore; it is
         # managed only via the Connection Setup wizard (hash-at-rest).
         for record in self:
-            icp.set_param(
+            service._icp_set(
                 "styd_odoo_bridge.enabled",
                 "True" if record.styd_bridge_enabled else "False",
             )
-            icp.set_param(
+            service._icp_set(
                 "styd_odoo_bridge.connector_owner_user_id",
                 str(record.styd_bridge_connector_owner_user_id.id or ""),
             )
