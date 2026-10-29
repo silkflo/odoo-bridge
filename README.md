@@ -1,4 +1,6 @@
-# Speak To Your Database Odoo Bridge
+# Speak To Your Database: Odoo MCP Connector for ChatGPT and Claude
+
+Connect Odoo to ChatGPT and Claude with an Odoo API key (no module needed), or install this Bridge for per-user access. Read-only.
 
 The Odoo Bridge module (`styd_odoo_bridge`) for **Speak To Your Database**.
 

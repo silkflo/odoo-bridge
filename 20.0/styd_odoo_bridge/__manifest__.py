@@ -1,7 +1,7 @@
 {
-    "name": "Speak To Your Database — AI Assistant for Odoo",
-    "version": "20.0.0.10.0",
-    "summary": "Ask your Odoo data questions in plain words, from ChatGPT, Claude or Speak To Your Database. Read-only answers on sales, invoices, stock, CRM and projects.",
+    "name": "Odoo MCP Connector for ChatGPT and Claude | Speak To Your Database",
+    "version": "20.0.0.10.1",
+    "summary": "Connect Odoo to ChatGPT and Claude. Ask questions in plain words and get read-only answers on sales, invoices, stock, CRM and projects. Works with an Odoo API key, no module needed, or with this Bridge for per-user access.",
     "category": "Tools",
     "author": "Speak To Your Database",
     "website": "https://speaktoyourdatabase.com",
