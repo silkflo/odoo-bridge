@@ -211,7 +211,7 @@ class StydOdooBridgeChannelWizard(models.TransientModel):
 
     # -- helpers ----------------------------------------------------------------
     def _check_admin(self):
-        if not self.env.user._is_system():
+        if not (self.env.su or self.env.user._is_system()):
             raise AccessError(_("Only an Odoo administrator can pair this database with STYD."))
 
     def _pairings(self):
@@ -229,6 +229,7 @@ class StydOdooBridgeChannelWizard(models.TransientModel):
 
     @api.model
     def default_get(self, fields_list):
+        self._check_admin()
         res = super().default_get(fields_list)
         owner_id = self.env["styd.odoo.bridge.service"]._get_connector_owner_user_id()
         owner = self.env["res.users"].browse(owner_id).exists() if owner_id else self.env["res.users"]

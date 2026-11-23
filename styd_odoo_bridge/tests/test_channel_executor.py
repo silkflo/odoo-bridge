@@ -97,7 +97,7 @@ class TestChannelExecutor(ChannelCase):
         orm = self.env["styd.odoo.bridge.orm"].sudo()
         out = self.run_op("orm.models", member=self.admin)
         self.assertEqual(out["body"]["access_mode"], "member_rights")
-        self.assertEqual([m["model"] for m in out["body"]["models"]], [m["model"] for m in orm.orm_list_models()])
+        self.assertEqual([m["model"] for m in out["body"]["models"]], [m["model"] for m in orm._orm_list_models()])
         out = self.run_op("orm.fields", args={"model": "res.partner"})
         self.assertEqual(set(out["body"]), {"ok", "access_mode", "model", "fields"})
         self.assertEqual(out["body"]["model"], "res.partner")
@@ -107,7 +107,7 @@ class TestChannelExecutor(ChannelCase):
         out = self.run_op("orm.search_read", args=args)
         self.assertEqual(out["status"], 200)
         route_like = {"ok": True, "access_mode": "member_rights", "model": "res.partner"}
-        route_like.update(orm.orm_search_read(model="res.partner", domain=args["domain"], fields=["name"]))
+        route_like.update(orm._orm_search_read(model="res.partner", domain=args["domain"], fields=["name"]))
         self.assertEqual(out["body"], route_like)
         out = self.run_op("orm.read_group", args={"model": "res.partner", "group_by": ["is_company"],
                                                   "domain": [["name", "=", "STYD channel partner"]]})
@@ -164,7 +164,7 @@ class TestChannelExecutor(ChannelCase):
         args = {"model": "res.partner", "domain": [["name", "ilike", "STYD rule "]], "fields": ["name"]}
         member_names = {r["name"] for r in self.run_op("orm.search_read", args=args)["body"]["records"]}
         admin_names = {r["name"] for r in self.run_op("orm.search_read", args=args, member=self.admin)["body"]["records"]}
-        route_names = {r["name"] for r in self.env["styd.odoo.bridge.orm"].sudo().orm_search_read(
+        route_names = {r["name"] for r in self.env["styd.odoo.bridge.orm"].sudo()._orm_search_read(
             model="res.partner", domain=args["domain"], fields=["name"])["records"]}
         self.assertEqual(member_names, {"STYD rule visible"})
         self.assertEqual(admin_names, {"STYD rule visible", "STYD rule hidden"})
@@ -178,6 +178,21 @@ class TestChannelExecutor(ChannelCase):
         self.assertEqual(set(ctx["allowed_company_ids"]), set(self.member.company_ids.ids))
         self.assertEqual(ctx["tz"], "Europe/Paris")
         self.assertTrue(ctx["styd_bridge_member_rights"])
+
+    def test_15_lang_and_company_ids_in_member_mode(self):
+        """M-R4/M-R5 over the channel: validated against the member's own languages and companies."""
+        args = {"model": "res.partner", "fields": ["name"], "limit": 1}
+        out = self.run_op("orm.search_read", args=dict(args, lang="xx_XX"))
+        self.assertEqual((out["status"], out["body"]["error"]), (400, "lang_invalid"))
+        self.assertEqual(self.run_op("orm.search_read", args=dict(args, lang="en_US"))["status"], 200)
+        company2 = self.env["res.company"].create({"name": "STYD member second"})
+        out = self.run_op("orm.search_read", args=dict(args, company_ids=[company2.id]))
+        self.assertEqual((out["status"], out["body"]["error"]), (400, "company_invalid"),
+                         "not one of the member's companies")
+        self.member.write({"company_ids": [Command.link(company2.id)]})
+        out = self.run_op("orm.read_group", args={"model": "res.partner", "group_by": ["is_company"],
+                                                  "company_ids": [company2.id, self.member.company_id.id]})
+        self.assertEqual(out["status"], 200, out["body"])
 
     # -- the read-only cursor ---------------------------------------------------------
     def test_20_readonly_cursor(self):

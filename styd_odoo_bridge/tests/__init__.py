@@ -6,3 +6,5 @@ from . import test_channel_protocol
 from . import test_channel_core
 from . import test_channel_executor
 from . import test_channel_pairing
+from . import test_rpc_access
+from . import test_read_policy

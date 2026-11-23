@@ -50,6 +50,9 @@ class ResConfigSettings(models.TransientModel):
                 record.styd_bridge_token_configured = False
 
     def get_values(self):
+        # Public on res.config.settings (the core's default_get calls it after its
+        # own access check): check here too, as this override reads with sudo.
+        self.check_access_rights("read")
         res = super().get_values()
         service = self.env["styd.odoo.bridge.service"]
 
@@ -75,6 +78,7 @@ class ResConfigSettings(models.TransientModel):
 
     def set_values(self):
         from .bridge_channel import resolve_verify
+        self.check_access_rights("write")
         for record in self:
             try:
                 resolve_verify(record.styd_bridge_channel_ca_bundle)

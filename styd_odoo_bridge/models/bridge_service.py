@@ -425,7 +425,7 @@ class StydOdooBridgeService(models.AbstractModel):
         ])
         return "enterprise" if module_count else "community"
 
-    def get_supported_features(self):
+    def _get_supported_features(self):
         return [
             "security_snapshot_v1",
             "odoo_user_directory_v1",
@@ -934,7 +934,7 @@ class StydOdooBridgeService(models.AbstractModel):
 
         return payload
 
-    def build_health_payload(self):
+    def _build_health_payload(self):
         return {
             "ok": True,
             "bridge_version": self.BRIDGE_VERSION,
@@ -944,10 +944,10 @@ class StydOdooBridgeService(models.AbstractModel):
             "database_uuid": self._get_database_uuid(),
             "server_time_utc": self._utc_now_iso(),
             "timezone": self._get_bridge_tz(),
-            "supported_features": self.get_supported_features(),
+            "supported_features": self._get_supported_features(),
         }
 
-    def build_security_snapshot_payload(self):
+    def _build_security_snapshot_payload(self):
         user = self._get_connector_owner()
 
         company_scope = self._build_company_scope_payload(user)
@@ -973,7 +973,7 @@ class StydOdooBridgeService(models.AbstractModel):
 
         return payload
 
-    def build_user_directory_snapshot_payload(self):
+    def _build_user_directory_snapshot_payload(self):
         return {
             "bridge_version": self.BRIDGE_VERSION,
             "snapshot_version": 1,
@@ -981,9 +981,9 @@ class StydOdooBridgeService(models.AbstractModel):
             "users": self._build_user_directory_payload(),
         }
 
-    def build_user_search_payload(self, query):
+    def _build_user_search_payload(self, query):
         """/users/search body: the directory filtered on login, name or email."""
-        directory = self.build_user_directory_snapshot_payload()
+        directory = self._build_user_directory_snapshot_payload()
         users = directory.get("users", [])
 
         q = str(query or "").strip().lower()
@@ -1004,7 +1004,7 @@ class StydOdooBridgeService(models.AbstractModel):
             "users": users,
         }
 
-    def build_capability_snapshot_payload(self):
+    def _build_capability_snapshot_payload(self):
         installed_modules = self._build_installed_modules_payload()
         available_models = self._build_available_models_payload()
         fields_payload = self._build_fields_payload()

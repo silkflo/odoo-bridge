@@ -99,6 +99,40 @@ ORM_MODEL_ALLOWLIST = frozenset({
     "maintenance.equipment",
     "maintenance.request",
     "maintenance.team",
+
+    # M-R2: every model STYD reads on an API key (odooReadPolicy.ts and its
+    # area lists), so one add-on upgrade covers them. STYD's switches keep
+    # deciding what is used. HR stays out (a separate owner decision).
+    # Point of Sale
+    "pos.order",
+    "pos.order.line",
+    "pos.session",
+    "pos.config",
+    "pos.payment",
+    "pos.payment.method",
+    "report.pos.order",
+    # Bank statements and reconciliation (ledger reader)
+    "account.bank.statement",
+    "account.bank.statement.line",
+    "account.partial.reconcile",
+    # Analytic accounting (cost centres)
+    "account.analytic.line",
+    "account.analytic.account",
+    "account.analytic.plan",
+    # Stock valuation, manufacturing extras
+    "stock.valuation.layer",
+    "mrp.workcenter",
+    "mrp.workcenter.productivity",
+    "mrp.workcenter.productivity.loss",
+    "mrp.routing.workcenter",
+    "mrp.unbuild",
+    # Project stages, milestones and updates
+    "project.task.type",
+    "project.project.stage",
+    "project.milestone",
+    "project.update",
+    # Currency rates (thresholds named in another currency)
+    "res.currency.rate",
 })
 # A field is forbidden if its lowercased name CONTAINS any of these substrings.
 ORM_FORBIDDEN_FIELD_SUBSTRINGS = (
@@ -129,6 +163,30 @@ ORM_GROUPABLE_FIELD_TYPES = frozenset({
 })
 
 ORM_NUMERIC_FIELD_TYPES = frozenset({"integer", "float", "monetary"})
+
+# M-R3: the named many2many exceptions of STYD's odooReadPolicy.ts, exactly.
+# Each is one field on one model, to one relation; the same name on any other
+# model stays refused, and so does any other many2many.
+# Group-by only (Odoo names each group, so the related model is never read);
+# never returned, filtered or ordered: {model: (field, relation)}.
+ORM_GROUP_ONLY_M2M = {
+    "account.move.line": ("tax_ids", "account.tax"),
+    "stock.move": ("scrap_reason_tag_ids", "stock.scrap.reason.tag"),
+    "project.task": ("user_ids", "res.users"),
+}
+# Filter "in" / "=" with positive user ids ("my tasks"): {model: (field, relation)}.
+ORM_FILTER_M2M = {
+    "project.task": ("user_ids", "res.users"),
+}
+# Returned when named (never in a read that names no fields, a domain, an
+# order or a group-by): {model: field}.
+ORM_RETURNED_M2M = {
+    "mrp.bom.line": "bom_product_template_attribute_value_ids",
+    "product.product": "product_template_attribute_value_ids",
+}
+
+# M-R5: at most this many companies in an ordered company_ids.
+ORM_MAX_COMPANY_IDS = 50
 
 ORM_ALLOWED_AGG_FUNCS = frozenset({"sum", "avg", "max", "min"})
 
@@ -245,7 +303,28 @@ class StydOdooBridgeOrm(models.AbstractModel):
             return ["|", ("company_id", "=", False), ("company_id", "in", companies.ids)]
         return []
 
-    def _orm_validate_fields(self, meta, fields):
+    def _orm_m2m_pair(self, table, model, field, info):
+        """True when (model, field) is the named pair of ``table``, as a stored
+        many2many to the named relation (odooReadPolicy.ts' isXxxGroup)."""
+        pair = table.get(model) if model else None
+        return bool(pair) and pair[0] == field and info.get("type") == "many2many" \
+            and info.get("relation") == pair[1] and bool(info.get("store"))
+
+    def _orm_is_assignee_filter(self, model, field, info, operator, value):
+        if not self._orm_m2m_pair(ORM_FILTER_M2M, model, field, info) or operator not in ("in", "="):
+            return False
+
+        def positive_id(v):
+            return isinstance(v, int) and not isinstance(v, bool) and v > 0
+
+        if isinstance(value, list):
+            return bool(value) and all(positive_id(v) for v in value)
+        return positive_id(value)
+
+    def _orm_is_returned_m2m(self, model, field, info):
+        return bool(model) and ORM_RETURNED_M2M.get(model) == field and info.get("type") == "many2many"
+
+    def _orm_validate_fields(self, meta, fields, model=None):
         if not fields:
             return [
                 fname for fname, info in meta.items()
@@ -260,7 +339,8 @@ class StydOdooBridgeOrm(models.AbstractModel):
                 raise StydOrmError("field_not_allowed", "Invalid field name.")
             if fname not in meta or self._orm_is_forbidden_field(fname):
                 raise StydOrmError("field_not_allowed", "Field not allowed: %s." % _short(fname))
-            if meta[fname].get("type") not in self.RETURNABLE_FIELD_TYPES:
+            if meta[fname].get("type") not in self.RETURNABLE_FIELD_TYPES \
+                    and not self._orm_is_returned_m2m(model, fname, meta[fname]):
                 raise StydOrmError("field_not_allowed", "Field type not returnable: %s." % _short(fname))
             safe.append(fname)
         return safe
@@ -280,7 +360,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
         elif not self._orm_is_scalar(value):
             raise StydOrmError("domain_invalid", "Invalid domain value.")
 
-    def _orm_validate_domain(self, meta, domain):
+    def _orm_validate_domain(self, meta, domain, model=None):
         if not domain:
             return []
         if not isinstance(domain, list):
@@ -303,7 +383,8 @@ class StydOdooBridgeOrm(models.AbstractModel):
                 raise StydOrmError("field_not_allowed", "Invalid or relational domain field.")
             if field not in meta or self._orm_is_forbidden_field(field):
                 raise StydOrmError("field_not_allowed", "Domain field not allowed: %s." % _short(field))
-            if meta[field].get("type") not in self.RETURNABLE_FIELD_TYPES:
+            if meta[field].get("type") not in self.RETURNABLE_FIELD_TYPES \
+                    and not self._orm_is_assignee_filter(model, field, meta[field], operator, value):
                 raise StydOrmError("field_not_allowed", "Domain field type not allowed: %s." % _short(field))
             if operator not in self.ALLOWED_DOMAIN_OPERATORS:
                 raise StydOrmError("operator_not_allowed", "Operator not allowed: %s." % _short(operator))
@@ -367,7 +448,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
             return 0
         return offset
 
-    def _orm_validate_group_by(self, meta, group_by):
+    def _orm_validate_group_by(self, meta, group_by, model=None):
         if not group_by:
             return []
         if not isinstance(group_by, list):
@@ -380,7 +461,8 @@ class StydOdooBridgeOrm(models.AbstractModel):
                 raise StydOrmError("field_not_allowed", "Invalid group_by field.")
             if gb not in meta or self._orm_is_forbidden_field(gb):
                 raise StydOrmError("field_not_allowed", "group_by field not allowed: %s." % _short(gb))
-            if not (meta[gb].get("store") and meta[gb].get("type") in self.GROUPABLE_FIELD_TYPES):
+            groupable = meta[gb].get("store") and meta[gb].get("type") in self.GROUPABLE_FIELD_TYPES
+            if not groupable and not self._orm_m2m_pair(ORM_GROUP_ONLY_M2M, model, gb, meta[gb]):
                 raise StydOrmError("field_not_allowed", "Field is not groupable: %s." % _short(gb))
             out.append(gb)
         return out
@@ -452,6 +534,45 @@ class StydOdooBridgeOrm(models.AbstractModel):
         if tz_mode != "company":
             raise StydOrmError("tz_invalid", 'tz_mode must be "company".')
         return self.env["styd.odoo.bridge.service"]._get_bridge_tz()
+
+    def _orm_resolve_lang(self, lang=None):
+        """M-R4: a language for the read's names, or None (the default). Only an
+        active res.lang code is accepted."""
+        if lang in (None, ""):
+            return None
+        if not isinstance(lang, str) or lang not in dict(self.env["res.lang"].get_installed()):
+            raise StydOrmError("lang_invalid", "lang must be the code of a language active in this Odoo.")
+        return lang
+
+    def _orm_resolve_companies(self, company_ids=None):
+        """M-R5: the companies a read runs for, in order (the first is the read's
+        company: on 18+ company-dependent values such as account codes are that
+        company's). Without company_ids: the scope as before. With them: an
+        ordered list of distinct ids, all inside the scope (the connector
+        owner's companies; the member's own over the channel)."""
+        scope = self._orm_scope_companies()
+        if company_ids is None:
+            return scope
+        if not isinstance(company_ids, list) or not company_ids or len(company_ids) > ORM_MAX_COMPANY_IDS:
+            raise StydOrmError("company_invalid", "company_ids must be a non-empty list of company ids.")
+        for cid in company_ids:
+            if not isinstance(cid, int) or isinstance(cid, bool) or cid < 1:
+                raise StydOrmError("company_invalid", "company_ids must be a non-empty list of company ids.")
+        if len(set(company_ids)) != len(company_ids):
+            raise StydOrmError("company_invalid", "company_ids must not repeat a company.")
+        if not set(company_ids) <= set(scope.ids):
+            raise StydOrmError("company_invalid", "company_ids must be companies this read may use.")
+        return scope.browse(company_ids)
+
+    def _orm_scoped(self, base, companies, tz=None, lang=None):
+        """The model to read with: the companies in order as allowed_company_ids,
+        then the optional tz and lang."""
+        scoped = base.with_context(allowed_company_ids=companies.ids)
+        if tz:
+            scoped = scoped.with_context(tz=tz)
+        if lang:
+            scoped = scoped.with_context(lang=lang)
+        return scoped
 
     def _orm_localize_leaf(self, field, operator, value, tz):
         """Rewrite one datetime leaf whose value is local time into UTC leaves.
@@ -552,7 +673,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
             orderby=order,
         )
 
-    def orm_list_models(self):
+    def _orm_list_models(self):
         out = []
         for model_name in sorted(self.MODEL_ALLOWLIST):
             if model_name not in self.env:
@@ -570,7 +691,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
             })
         return out
 
-    def orm_model_fields(self, model_name):
+    def _orm_model_fields(self, model_name):
         self._orm_check_model(model_name)
         model = self._orm_base(model_name)
         if self._orm_member_rights():
@@ -598,27 +719,26 @@ class StydOdooBridgeOrm(models.AbstractModel):
             })
         return out
 
-    def orm_search_read(self, model, domain=None, fields=None, limit=None, offset=None, order=None,
-                        tz=None, tz_mode=None):
+    def _orm_search_read(self, model, domain=None, fields=None, limit=None, offset=None, order=None,
+                         tz=None, tz_mode=None, lang=None, company_ids=None):
         self._orm_check_model(model)
         base = self._orm_base(model)
         if self._orm_member_rights():
             base.check_access_rights("read")
         meta = base.fields_get()
 
-        safe_fields = self._orm_validate_fields(meta, fields)
-        valid_domain = self._orm_validate_domain(meta, domain)
+        safe_fields = self._orm_validate_fields(meta, fields, model=model)
+        valid_domain = self._orm_validate_domain(meta, domain, model=model)
         valid_order = self._orm_validate_order(meta, order)
         resolved_limit = self._orm_resolve_limit(limit)
         resolved_offset = self._orm_resolve_offset(offset)
         resolved_tz = self._orm_resolve_tz(tz, tz_mode)
+        resolved_lang = self._orm_resolve_lang(lang)
         valid_domain = self._orm_localize_domain(meta, valid_domain, resolved_tz)
 
-        companies = self._orm_scope_companies()
+        companies = self._orm_resolve_companies(company_ids)
         final_domain = self._orm_company_domain(model, companies) + valid_domain
-        scoped = base.with_context(allowed_company_ids=companies.ids)
-        if resolved_tz:
-            scoped = scoped.with_context(tz=resolved_tz)
+        scoped = self._orm_scoped(base, companies, resolved_tz, resolved_lang)
 
         records = scoped.search_read(
             domain=final_domain,
@@ -642,27 +762,26 @@ class StydOdooBridgeOrm(models.AbstractModel):
             result["datetime_format"] = ORM_TZ_DATETIME_FORMAT
         return result
 
-    def orm_read_group(self, model, domain=None, group_by=None, aggregates=None, limit=None, order=None,
-                       tz=None, tz_mode=None):
+    def _orm_read_group(self, model, domain=None, group_by=None, aggregates=None, limit=None, order=None,
+                        tz=None, tz_mode=None, lang=None, company_ids=None):
         self._orm_check_model(model)
         base = self._orm_base(model)
         if self._orm_member_rights():
             base.check_access_rights("read")
         meta = base.fields_get()
 
-        valid_group_by = self._orm_validate_group_by(meta, group_by)
+        valid_group_by = self._orm_validate_group_by(meta, group_by, model=model)
         agg_specs, agg_names = self._orm_validate_aggregates(meta, aggregates)
-        valid_domain = self._orm_validate_domain(meta, domain)
+        valid_domain = self._orm_validate_domain(meta, domain, model=model)
         resolved_limit = self._orm_resolve_limit(limit)
         valid_order = self._orm_validate_group_order(order, valid_group_by, agg_names)
         resolved_tz = self._orm_resolve_tz(tz, tz_mode)
+        resolved_lang = self._orm_resolve_lang(lang)
         valid_domain = self._orm_localize_domain(meta, valid_domain, resolved_tz)
 
-        companies = self._orm_scope_companies()
+        companies = self._orm_resolve_companies(company_ids)
         final_domain = self._orm_company_domain(model, companies) + valid_domain
-        scoped = base.with_context(allowed_company_ids=companies.ids)
-        if resolved_tz:
-            scoped = scoped.with_context(tz=resolved_tz)
+        scoped = self._orm_scoped(base, companies, resolved_tz, resolved_lang)
 
         raw_groups = self._orm_run_read_group(
             scoped,

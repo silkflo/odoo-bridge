@@ -182,17 +182,17 @@ def _run_owner_op(su_env, op, args, owner_uid):
     service = su_env["styd.odoo.bridge.service"].with_context(styd_bridge_connector_owner_uid=owner_uid).sudo()
     if op == "health":
         try:
-            return 200, service.build_health_payload(), None, None
+            return 200, service._build_health_payload(), None, None
         except Exception as exc:
             return _err(500, "health_build_failed", str(exc)) + (None, None)
     if op == "security.snapshot":
         try:
-            return 200, service.build_security_snapshot_payload(), None, None
+            return 200, service._build_security_snapshot_payload(), None, None
         except Exception as exc:
             return _err(500, "snapshot_build_failed", str(exc)) + (None, None)
     if op == "users.directory":
         try:
-            payload = service.build_user_directory_snapshot_payload()
+            payload = service._build_user_directory_snapshot_payload()
             return 200, payload, len(payload.get("users") or []), None
         except Exception as exc:
             return _err(500, "user_directory_build_failed", str(exc)) + (None, None)
@@ -200,13 +200,13 @@ def _run_owner_op(su_env, op, args, owner_uid):
         q = args.get("q")
         q = q[:USERS_SEARCH_MAX_LEN] if isinstance(q, str) else None
         try:
-            payload = service.build_user_search_payload(q)
+            payload = service._build_user_search_payload(q)
             return 200, payload, payload.get("count"), None
         except Exception as exc:
             return _err(500, "user_search_failed", str(exc)) + (None, None)
     if op == "capabilities":
         try:
-            return 200, service.build_capability_snapshot_payload(), None, None
+            return 200, service._build_capability_snapshot_payload(), None, None
         except Exception as exc:
             return _err(500, "capability_snapshot_build_failed", str(exc)) + (None, None)
     raise proto.ChannelError("op_not_allowed")
@@ -218,14 +218,14 @@ def _run_member_op(env, op, args):
     detail = "model=%s" % str(model)[:64]
     try:
         if op == "orm.models":
-            models_list = orm.orm_list_models()
+            models_list = orm._orm_list_models()
             return 200, {"ok": True, "access_mode": ORM_MEMBER_ACCESS_MODE, "models": models_list}, len(models_list), None
         if op == "orm.fields":
-            fields_list = orm.orm_model_fields(model)
+            fields_list = orm._orm_model_fields(model)
             body = {"ok": True, "access_mode": ORM_MEMBER_ACCESS_MODE, "model": model, "fields": fields_list}
             return 200, body, len(fields_list), detail
         if op == "orm.search_read":
-            result = orm.orm_search_read(
+            result = orm._orm_search_read(
                 model=model,
                 domain=args.get("domain"),
                 fields=args.get("fields"),
@@ -234,9 +234,11 @@ def _run_member_op(env, op, args):
                 order=args.get("order"),
                 tz=args.get("tz"),
                 tz_mode=args.get("tz_mode"),
+                lang=args.get("lang"),
+                company_ids=args.get("company_ids"),
             )
         else:
-            result = orm.orm_read_group(
+            result = orm._orm_read_group(
                 model=model,
                 domain=args.get("domain"),
                 group_by=args.get("group_by"),
@@ -245,6 +247,8 @@ def _run_member_op(env, op, args):
                 order=args.get("order"),
                 tz=args.get("tz"),
                 tz_mode=args.get("tz_mode"),
+                lang=args.get("lang"),
+                company_ids=args.get("company_ids"),
             )
         body = {"ok": True, "access_mode": ORM_MEMBER_ACCESS_MODE, "model": model}
         body.update(result)

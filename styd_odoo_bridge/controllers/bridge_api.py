@@ -215,7 +215,7 @@ class StydBridgeApi(http.Controller):
         return request.env["styd.odoo.bridge.service"].sudo()
 
     def _build_user_search_payload(self, service, query):
-        return service.build_user_search_payload(query)
+        return service._build_user_search_payload(query)
 
     @http.route(
         "/styd_bridge/v1/health",
@@ -233,7 +233,7 @@ class StydBridgeApi(http.Controller):
         service = self._get_service()
 
         try:
-            payload = service.build_health_payload()
+            payload = service._build_health_payload()
         except Exception as exc:
             # Preserve the original behaviour (no JSON error shape existed here),
             # but record the failure before re-raising.
@@ -259,7 +259,7 @@ class StydBridgeApi(http.Controller):
         service = self._get_service()
 
         try:
-            payload = service.build_security_snapshot_payload()
+            payload = service._build_security_snapshot_payload()
         except Exception as exc:
             self._audit_log(endpoint, "error", "snapshot_build_failed", 500, str(exc))
             return self._error_response(
@@ -287,7 +287,7 @@ class StydBridgeApi(http.Controller):
         service = self._get_service()
 
         try:
-            payload = service.build_user_directory_snapshot_payload()
+            payload = service._build_user_directory_snapshot_payload()
         except Exception as exc:
             self._audit_log(endpoint, "error", "user_directory_build_failed", 500, str(exc))
             return self._error_response(
@@ -344,7 +344,7 @@ class StydBridgeApi(http.Controller):
         service = self._get_service()
 
         try:
-            payload = service.build_capability_snapshot_payload()
+            payload = service._build_capability_snapshot_payload()
         except Exception as exc:
             self._audit_log(endpoint, "error", "capability_snapshot_build_failed", 500, str(exc))
             return self._error_response(
@@ -394,7 +394,7 @@ class StydBridgeApi(http.Controller):
 
         orm = self._get_orm()
         try:
-            models = orm.orm_list_models()
+            models = orm._orm_list_models()
         except Exception as exc:
             _logger.warning("STYD bridge: /models failed (error_type=%s)", type(exc).__name__)
             self._audit_log(endpoint, "error", "orm_error", 500, "models listing failed")
@@ -421,7 +421,7 @@ class StydBridgeApi(http.Controller):
 
         orm = self._get_orm()
         try:
-            fields = orm.orm_model_fields(model)
+            fields = orm._orm_model_fields(model)
         except StydOrmError as exc:
             self._audit_log(endpoint, "denied", exc.code, 400, "model=%s" % str(model)[:64])
             return self._error_response(exc.code, exc.message, status=400)
@@ -457,7 +457,7 @@ class StydBridgeApi(http.Controller):
         model = body.get("model")
         orm = self._get_orm()
         try:
-            result = orm.orm_search_read(
+            result = orm._orm_search_read(
                 model=model,
                 domain=body.get("domain"),
                 fields=body.get("fields"),
@@ -466,6 +466,8 @@ class StydBridgeApi(http.Controller):
                 order=body.get("order"),
                 tz=body.get("tz"),
                 tz_mode=body.get("tz_mode"),
+                lang=body.get("lang"),
+                company_ids=body.get("company_ids"),
             )
         except StydOrmError as exc:
             self._audit_log(endpoint, "denied", exc.code, 400, "model=%s" % str(model)[:64])
@@ -501,7 +503,7 @@ class StydBridgeApi(http.Controller):
         model = body.get("model")
         orm = self._get_orm()
         try:
-            result = orm.orm_read_group(
+            result = orm._orm_read_group(
                 model=model,
                 domain=body.get("domain"),
                 group_by=body.get("group_by"),
@@ -510,6 +512,8 @@ class StydBridgeApi(http.Controller):
                 order=body.get("order"),
                 tz=body.get("tz"),
                 tz_mode=body.get("tz_mode"),
+                lang=body.get("lang"),
+                company_ids=body.get("company_ids"),
             )
         except StydOrmError as exc:
             self._audit_log(endpoint, "denied", exc.code, 400, "model=%s" % str(model)[:64])
