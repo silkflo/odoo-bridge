@@ -1,4 +1,5 @@
 from odoo import fields, models
+from odoo.exceptions import AccessError
 
 
 class ResConfigSettings(models.TransientModel):
@@ -33,7 +34,14 @@ class ResConfigSettings(models.TransientModel):
             except Exception:
                 record.styd_bridge_token_configured = False
 
+    def _styd_bridge_check_admin(self):
+        """Buttons and form values are for Odoo administrators only: they run
+        through sudo helpers, so an RPC call by anyone else is refused."""
+        if not (self.env.su or self.env.user._is_system()):
+            raise AccessError("Only an Odoo administrator can manage the Speak To Your Database Bridge.")
+
     def get_values(self):
+        self._styd_bridge_check_admin()
         res = super().get_values()
         service = self.env["styd.odoo.bridge.service"]
 
@@ -58,6 +66,7 @@ class ResConfigSettings(models.TransientModel):
         return res
 
     def set_values(self):
+        self._styd_bridge_check_admin()
         super().set_values()
         service = self.env["styd.odoo.bridge.service"]
 

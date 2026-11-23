@@ -120,7 +120,7 @@ class StydBridgeApi(http.Controller):
         return request.env["styd.odoo.bridge.service"].sudo()
 
     def _build_user_search_payload(self, service, query):
-        directory = service.build_user_directory_snapshot_payload()
+        directory = service._build_user_directory_snapshot_payload()
         users = directory.get("users", [])
 
         q = str(query or "").strip().lower()
@@ -154,7 +154,7 @@ class StydBridgeApi(http.Controller):
             return access["response"]
 
         service = self._get_service()
-        payload = service.build_health_payload()
+        payload = service._build_health_payload()
 
         return self._json_response(payload, status=200)
 
@@ -173,7 +173,7 @@ class StydBridgeApi(http.Controller):
         service = self._get_service()
 
         try:
-            payload = service.build_security_snapshot_payload()
+            payload = service._build_security_snapshot_payload()
             return self._json_response(payload, status=200)
         except Exception as exc:
             return self._error_response(
@@ -197,7 +197,7 @@ class StydBridgeApi(http.Controller):
         service = self._get_service()
 
         try:
-            payload = service.build_user_directory_snapshot_payload()
+            payload = service._build_user_directory_snapshot_payload()
             return self._json_response(payload, status=200)
         except Exception as exc:
             return self._error_response(
@@ -246,7 +246,7 @@ class StydBridgeApi(http.Controller):
         service = self._get_service()
 
         try:
-            payload = service.build_capability_snapshot_payload()
+            payload = service._build_capability_snapshot_payload()
             return self._json_response(payload, status=200)
         except Exception as exc:
             return self._error_response(
@@ -309,7 +309,7 @@ class StydBridgeApi(http.Controller):
 
         orm = self._get_orm()
         try:
-            models = orm.orm_list_models()
+            models = orm._orm_list_models()
         except Exception as exc:
             _logger.warning(
                 "STYD bridge: /models failed (error_type=%s)", type(exc).__name__
@@ -335,7 +335,7 @@ class StydBridgeApi(http.Controller):
 
         orm = self._get_orm()
         try:
-            fields = orm.orm_model_fields(model)
+            fields = orm._orm_model_fields(model)
         except StydOrmError as exc:
             return self._error_response(exc.code, exc.message, status=400)
         except Exception as exc:
@@ -379,7 +379,7 @@ class StydBridgeApi(http.Controller):
         model = body.get("model")
         orm = self._get_orm()
         try:
-            result = orm.orm_search_read(
+            result = orm._orm_search_read(
                 model=model,
                 domain=body.get("domain"),
                 fields=body.get("fields"),
@@ -423,7 +423,7 @@ class StydBridgeApi(http.Controller):
         model = body.get("model")
         orm = self._get_orm()
         try:
-            result = orm.orm_read_group(
+            result = orm._orm_read_group(
                 model=model,
                 domain=body.get("domain"),
                 group_by=body.get("group_by"),
