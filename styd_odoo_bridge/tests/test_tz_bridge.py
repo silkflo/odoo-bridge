@@ -42,12 +42,12 @@ class TestStydBridgeTimezone(TransactionCase):
         domain = [("create_date", ">=", "2026-10-01")]
         self.assertIs(self.orm._orm_localize_domain(self.meta, domain, None), domain)
         self.assertIsNone(self.orm._orm_resolve_tz(None, None))
-        result = self.orm.orm_search_read(
+        result = self.orm._orm_search_read(
             "res.partner", domain=[["id", "=", self.partner.id]], fields=["name", "create_date"],
         )
         self.assertNotIn("tz", result)
         self.assertNotIn("datetime_format", result)
-        grouped = self.orm.orm_read_group(
+        grouped = self.orm._orm_read_group(
             "res.partner", domain=[["id", "=", self.partner.id]], group_by=["create_date"], aggregates=[],
         )
         self.assertNotIn("tz", grouped)
@@ -112,7 +112,7 @@ class TestStydBridgeTimezone(TransactionCase):
     # 5. search-read: "this month" in Bangkok includes the order, values are local.
     def test_05_search_read_with_tz(self):
         base = [["id", "=", self.partner.id]]
-        october = self.orm.orm_search_read(
+        october = self.orm._orm_search_read(
             "res.partner", domain=base + [["create_date", ">=", "2026-10-01"]],
             fields=["name", "create_date"], tz=BANGKOK,
         )
@@ -120,7 +120,7 @@ class TestStydBridgeTimezone(TransactionCase):
         self.assertEqual(october["records"][0]["create_date"], "2026-10-01T05:00:00+07:00")
         self.assertEqual(october["tz"], BANGKOK)
         self.assertEqual(october["datetime_format"], "iso8601_offset")
-        september = self.orm.orm_search_read(
+        september = self.orm._orm_search_read(
             "res.partner", domain=base + [["create_date", "<", "2026-10-01"]],
             fields=["name"], tz=BANGKOK,
         )
@@ -129,7 +129,7 @@ class TestStydBridgeTimezone(TransactionCase):
     # 6. read-group: monthly buckets follow the time zone and expose their bounds.
     def test_06_read_group_buckets(self):
         base = [["id", "=", self.partner.id]]
-        local = self.orm.orm_read_group(
+        local = self.orm._orm_read_group(
             "res.partner", domain=base, group_by=["create_date"], aggregates=[], tz=BANGKOK,
         )
         group = local["groups"][0]
@@ -139,7 +139,7 @@ class TestStydBridgeTimezone(TransactionCase):
             "from": "2026-10-01T00:00:00+07:00",
             "to": "2026-11-01T00:00:00+07:00",
         })
-        utc = self.orm.orm_read_group(
+        utc = self.orm._orm_read_group(
             "res.partner", domain=base, group_by=["create_date"], aggregates=[], tz="UTC",
         )
         self.assertEqual(utc["groups"][0]["create_date"], "September 2026")
@@ -177,9 +177,9 @@ class TestStydBridgeTimezone(TransactionCase):
 
     # 9. The time zone is advertised (additive keys only).
     def test_09_timezone_advertised(self):
-        health = self.service.build_health_payload()
+        health = self.service._build_health_payload()
         self.assertIn("tz_aware_v1", health["supported_features"])
         self.assertTrue(health["timezone"])
-        capabilities = self.service.build_capability_snapshot_payload()
+        capabilities = self.service._build_capability_snapshot_payload()
         self.assertEqual(capabilities["instance"]["timezone"], health["timezone"])
         self.assertEqual(capabilities["configuration_hints"]["timezone"], health["timezone"])
