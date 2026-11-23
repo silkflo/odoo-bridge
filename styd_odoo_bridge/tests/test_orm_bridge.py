@@ -7,7 +7,7 @@ from odoo.tests.common import TransactionCase
 
 from odoo.addons.styd_odoo_bridge.models.bridge_orm import StydOrmError
 
-EXPECTED_MANIFEST_VERSION = "19.0.0.10.0"
+EXPECTED_MANIFEST_VERSION = "19.0.0.10.2"
 
 
 @tagged("post_install", "-at_install")
@@ -29,7 +29,7 @@ class TestStydOrmBridge(TransactionCase):
 
     # 1. /models returns only allowlisted models that are actually installed
     def test_01_list_models_allowlist_only(self):
-        models = self.orm.orm_list_models()
+        models = self.orm._orm_list_models()
         names = {m["model"] for m in models}
         # Never lists anything outside the allowlist...
         self.assertTrue(names.issubset(self.orm.MODEL_ALLOWLIST))
@@ -54,7 +54,7 @@ class TestStydOrmBridge(TransactionCase):
 
     # 2. /models/<model>/fields returns safe field metadata
     def test_02_model_fields_metadata(self):
-        fields = self.orm.orm_model_fields("res.partner")
+        fields = self.orm._orm_model_fields("res.partner")
         by_name = {f["name"]: f for f in fields}
         self.assertIn("name", by_name)
         self.assertIn("email", by_name)
@@ -73,7 +73,7 @@ class TestStydOrmBridge(TransactionCase):
         self.assertFalse(self.orm._orm_is_forbidden_field("author_id"))
         self.assertFalse(self.orm._orm_is_forbidden_field("authorized_transaction_ids"))
         self.assertFalse(self.orm._orm_is_forbidden_field("authority_id"))
-        for f in self.orm.orm_model_fields("res.partner"):
+        for f in self.orm._orm_model_fields("res.partner"):
             low = f["name"].lower()
             for bad in self.orm.FORBIDDEN_FIELD_SUBSTRINGS:
                 self.assertNotIn(bad, low)
@@ -84,19 +84,19 @@ class TestStydOrmBridge(TransactionCase):
     def test_04_blocked_model(self):
         for blocked in ("ir.config_parameter", "res.groups", "ir.model.access"):
             with self.assertRaises(StydOrmError) as cm:
-                self.orm.orm_model_fields(blocked)
+                self.orm._orm_model_fields(blocked)
             self.assertEqual(cm.exception.code, "model_not_allowed")
         with self.assertRaises(StydOrmError) as cm2:
-            self.orm.orm_search_read("ir.config_parameter", fields=["key"])
+            self.orm._orm_search_read("ir.config_parameter", fields=["key"])
         self.assertEqual(cm2.exception.code, "model_not_allowed")
         with self.assertRaises(StydOrmError) as cm3:
-            self.orm.orm_read_group("res.groups", group_by=[], aggregates=[])
+            self.orm._orm_read_group("res.groups", group_by=[], aggregates=[])
         self.assertEqual(cm3.exception.code, "model_not_allowed")
 
     # 5. search-read works for res.partner with safe fields
     def test_05_search_read_partner_safe(self):
         self.env["res.partner"].create({"name": "STYD Test Partner"})
-        result = self.orm.orm_search_read(
+        result = self.orm._orm_search_read(
             "res.partner",
             domain=[["name", "=", "STYD Test Partner"]],
             fields=["name", "email"],
@@ -110,25 +110,25 @@ class TestStydOrmBridge(TransactionCase):
     # 6. search-read rejects unsupported domain/operator
     def test_06_search_read_rejects_bad_domain(self):
         with self.assertRaises(StydOrmError) as cm:
-            self.orm.orm_search_read("res.partner", domain=[["name", "child_of", 1]], fields=["name"])
+            self.orm._orm_search_read("res.partner", domain=[["name", "child_of", 1]], fields=["name"])
         self.assertEqual(cm.exception.code, "operator_not_allowed")
         with self.assertRaises(StydOrmError) as cm2:
-            self.orm.orm_search_read("res.partner", domain=[["password", "=", "x"]], fields=["name"])
+            self.orm._orm_search_read("res.partner", domain=[["password", "=", "x"]], fields=["name"])
         self.assertEqual(cm2.exception.code, "field_not_allowed")
         with self.assertRaises(StydOrmError) as cm3:
-            self.orm.orm_search_read("res.partner", domain="not-a-list", fields=["name"])
+            self.orm._orm_search_read("res.partner", domain="not-a-list", fields=["name"])
         self.assertEqual(cm3.exception.code, "domain_invalid")
 
     # 7. search-read caps/rejects too-large limit
     def test_07_search_read_limit_exceeded(self):
         with self.assertRaises(StydOrmError) as cm:
-            self.orm.orm_search_read("res.partner", fields=["name"], limit=999)
+            self.orm._orm_search_read("res.partner", fields=["name"], limit=999)
         self.assertEqual(cm.exception.code, "limit_exceeded")
 
     # 8. read-group works (company_type is not stored, so group on the stored "type")
     def test_08_read_group_partner(self):
         self.env["res.partner"].create({"name": "STYD G1", "is_company": True})
-        result = self.orm.orm_read_group(
+        result = self.orm._orm_read_group(
             "res.partner",
             domain=[],
             group_by=["type"],
@@ -143,26 +143,26 @@ class TestStydOrmBridge(TransactionCase):
     # 9. read-group rejects unsafe aggregate/group fields
     def test_09_read_group_rejects_unsafe(self):
         with self.assertRaises(StydOrmError) as cm:
-            self.orm.orm_read_group("res.partner", group_by=["type"], aggregates=["name:sum"])
+            self.orm._orm_read_group("res.partner", group_by=["type"], aggregates=["name:sum"])
         self.assertEqual(cm.exception.code, "field_not_allowed")
         with self.assertRaises(StydOrmError) as cm2:
-            self.orm.orm_read_group("res.partner", group_by=["password"], aggregates=[])
+            self.orm._orm_read_group("res.partner", group_by=["password"], aggregates=[])
         self.assertEqual(cm2.exception.code, "field_not_allowed")
         with self.assertRaises(StydOrmError) as cm3:
-            self.orm.orm_read_group("res.partner", group_by=["type", "country_id", "email"], aggregates=[])
+            self.orm._orm_read_group("res.partner", group_by=["type", "country_id", "email"], aggregates=[])
         self.assertEqual(cm3.exception.code, "field_not_allowed")
 
     # order validation
     def test_10_order_validation(self):
         with self.assertRaises(StydOrmError) as cm:
-            self.orm.orm_search_read("res.partner", fields=["name"], order="password desc")
+            self.orm._orm_search_read("res.partner", fields=["name"], order="password desc")
         self.assertEqual(cm.exception.code, "order_invalid")
-        ok = self.orm.orm_search_read("res.partner", fields=["name"], order="name desc", limit=5)
+        ok = self.orm._orm_search_read("res.partner", fields=["name"], order="name desc", limit=5)
         self.assertIn("records", ok)
 
     # default fields never include forbidden ones
     def test_11_default_fields_safe(self):
-        result = self.orm.orm_search_read("res.partner", fields=None, limit=1)
+        result = self.orm._orm_search_read("res.partner", fields=None, limit=1)
         if result["records"]:
             for key in result["records"][0].keys():
                 low = key.lower()
@@ -173,18 +173,18 @@ class TestStydOrmBridge(TransactionCase):
     def test_12_unbalanced_domain_rejected(self):
         # '&' is binary but only one operand follows
         with self.assertRaises(StydOrmError) as cm:
-            self.orm.orm_search_read("res.partner", domain=["&", ["name", "=", "x"]], fields=["name"])
+            self.orm._orm_search_read("res.partner", domain=["&", ["name", "=", "x"]], fields=["name"])
         self.assertEqual(cm.exception.code, "domain_invalid")
         # trailing operator
         with self.assertRaises(StydOrmError) as cm2:
-            self.orm.orm_search_read("res.partner", domain=[["name", "=", "x"], "|"], fields=["name"])
+            self.orm._orm_search_read("res.partner", domain=[["name", "=", "x"], "|"], fields=["name"])
         self.assertEqual(cm2.exception.code, "domain_invalid")
         # lone unary operator
         with self.assertRaises(StydOrmError) as cm3:
-            self.orm.orm_search_read("res.partner", domain=["!"], fields=["name"])
+            self.orm._orm_search_read("res.partner", domain=["!"], fields=["name"])
         self.assertEqual(cm3.exception.code, "domain_invalid")
         # a valid implicit-AND multi-leaf domain still passes
-        ok = self.orm.orm_search_read(
+        ok = self.orm._orm_search_read(
             "res.partner",
             domain=[["name", "!=", False], ["name", "!=", "zzz-nope"]],
             fields=["name"], limit=5,
@@ -194,14 +194,14 @@ class TestStydOrmBridge(TransactionCase):
     # 13. Phase 5H-D — an empty group_by is a VALID global aggregation (the fix).
     def test_13_read_group_empty_group_by_global(self):
         self.env["res.partner"].create({"name": "STYD Global Agg"})
-        result = self.orm.orm_read_group("res.partner", domain=[], group_by=[], aggregates=[])
+        result = self.orm._orm_read_group("res.partner", domain=[], group_by=[], aggregates=[])
         self.assertIn("groups", result)
         self.assertEqual(result["group_by"], [])
         self.assertEqual(result["returned_count"], 1)
         self.assertIn("count", result["groups"][0])
         self.assertGreaterEqual(result["groups"][0]["count"], 1)
         # group_by omitted (None) behaves the same — one global group.
-        result_none = self.orm.orm_read_group("res.partner", domain=[], group_by=None, aggregates=[])
+        result_none = self.orm._orm_read_group("res.partner", domain=[], group_by=None, aggregates=[])
         self.assertEqual(result_none["group_by"], [])
         self.assertEqual(result_none["returned_count"], 1)
 
@@ -209,15 +209,15 @@ class TestStydOrmBridge(TransactionCase):
     def test_14_empty_group_by_keeps_guards(self):
         # unsafe aggregate field (char, not numeric) still rejected
         with self.assertRaises(StydOrmError) as cm:
-            self.orm.orm_read_group("res.partner", group_by=[], aggregates=["name:sum"])
+            self.orm._orm_read_group("res.partner", group_by=[], aggregates=["name:sum"])
         self.assertEqual(cm.exception.code, "field_not_allowed")
         # non-allowlisted model still rejected (model check runs first)
         with self.assertRaises(StydOrmError) as cm2:
-            self.orm.orm_read_group("ir.config_parameter", group_by=[], aggregates=[])
+            self.orm._orm_read_group("ir.config_parameter", group_by=[], aggregates=[])
         self.assertEqual(cm2.exception.code, "model_not_allowed")
         # domain validation still enforced with an empty group_by
         with self.assertRaises(StydOrmError) as cm3:
-            self.orm.orm_read_group("res.partner", domain=[["password", "=", "x"]], group_by=[], aggregates=[])
+            self.orm._orm_read_group("res.partner", domain=[["password", "=", "x"]], group_by=[], aggregates=[])
         self.assertEqual(cm3.exception.code, "field_not_allowed")
 
     # 15. the aggregate validator accepts STORED numeric/monetary fields and
@@ -282,20 +282,20 @@ class TestStydOrmBridge(TransactionCase):
             "res.company": ["name"],
         }
         for model_name, fnames in safe_fields.items():
-            meta = self.orm.orm_model_fields(model_name)
+            meta = self.orm._orm_model_fields(model_name)
             self.assertTrue(meta, "expected field metadata for %s" % model_name)
             for f in meta:
                 low = f["name"].lower()
                 for bad in self.orm.FORBIDDEN_FIELD_SUBSTRINGS:
                     self.assertNotIn(bad, low)
-            result = self.orm.orm_search_read(model_name, fields=fnames, limit=1)
+            result = self.orm._orm_search_read(model_name, fields=fnames, limit=1)
             self.assertIn("records", result)
         # res.users is not readable through the generic ORM endpoints.
         with self.assertRaises(StydOrmError) as cm:
-            self.orm.orm_model_fields("res.users")
+            self.orm._orm_model_fields("res.users")
         self.assertEqual(cm.exception.code, "model_not_allowed")
         with self.assertRaises(StydOrmError) as cm2:
-            self.orm.orm_search_read("res.users", fields=["login"], limit=1)
+            self.orm._orm_search_read("res.users", fields=["login"], limit=1)
         self.assertEqual(cm2.exception.code, "model_not_allowed")
 
     # 17. (req #3) a model that is allowlisted but whose Odoo app is NOT installed
@@ -310,16 +310,16 @@ class TestStydOrmBridge(TransactionCase):
         missing = [m for m in candidates
                    if m in self.orm.MODEL_ALLOWLIST and m not in self.env]
         self.assertTrue(missing, "expected allowlisted-but-uninstalled models in a base-only DB")
-        listed = {m["model"] for m in self.orm.orm_list_models()}
+        listed = {m["model"] for m in self.orm._orm_list_models()}
         for model_name in missing:
             with self.assertRaises(StydOrmError) as cm:
-                self.orm.orm_model_fields(model_name)
+                self.orm._orm_model_fields(model_name)
             self.assertEqual(cm.exception.code, "model_not_installed")
             with self.assertRaises(StydOrmError) as cm2:
-                self.orm.orm_search_read(model_name, fields=["name"], limit=5)
+                self.orm._orm_search_read(model_name, fields=["name"], limit=5)
             self.assertEqual(cm2.exception.code, "model_not_installed")
             with self.assertRaises(StydOrmError) as cm3:
-                self.orm.orm_read_group(model_name, group_by=[], aggregates=[])
+                self.orm._orm_read_group(model_name, group_by=[], aggregates=[])
             self.assertEqual(cm3.exception.code, "model_not_installed")
             self.assertNotIn(model_name, listed)
 
@@ -354,22 +354,23 @@ class TestStydOrmBridge(TransactionCase):
     #     advertises the documented access mode, and running those primitives never
     #     mutates the database.
     def test_19_bridge_is_read_only(self):
-        public = {n for n in dir(self.orm) if n.startswith("orm_")}
-        self.assertEqual(
-            public,
-            {"orm_list_models", "orm_model_fields", "orm_search_read", "orm_read_group"},
-        )
+        # The read entry points are private (never callable over RPC) and no
+        # public orm_* name exists at all.
+        self.assertEqual({n for n in dir(self.orm) if n.startswith("orm_")}, set())
+        for reader in ("_orm_list_models", "_orm_model_fields", "_orm_search_read", "_orm_read_group"):
+            self.assertTrue(callable(getattr(self.orm, reader)), reader)
         for writer in ("orm_create", "orm_write", "orm_unlink", "orm_copy",
                        "orm_call", "orm_call_kw", "orm_action"):
             self.assertFalse(hasattr(self.orm, writer), writer)
+            self.assertFalse(hasattr(self.orm, "_" + writer), writer)
         self.assertEqual(self.orm.ACCESS_MODE, "sudo_company_scoped")
         # Behavioural: the read path leaves the row count unchanged.
         self.env["res.partner"].create({"name": "STYD RO Probe"})
         before = self.env["res.partner"].search_count([])
-        self.orm.orm_search_read("res.partner", fields=["name"], limit=50)
-        self.orm.orm_read_group("res.partner", group_by=["type"], aggregates=[])
-        self.orm.orm_model_fields("res.partner")
-        self.orm.orm_list_models()
+        self.orm._orm_search_read("res.partner", fields=["name"], limit=50)
+        self.orm._orm_read_group("res.partner", group_by=["type"], aggregates=[])
+        self.orm._orm_model_fields("res.partner")
+        self.orm._orm_list_models()
         self.assertEqual(self.env["res.partner"].search_count([]), before)
 
     # 20. (req #4) the HTTP surface exposes no state-changing verbs -- every bridge
