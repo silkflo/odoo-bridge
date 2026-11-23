@@ -42,7 +42,7 @@ class TestReadGroupShape(TransactionCase):
         self.domain = [["id", "in", self.partners.ids]]
 
     def _bridge(self, case):
-        return _as_json(self.orm.orm_read_group(
+        return _as_json(self.orm._orm_read_group(
             "res.partner",
             domain=self.domain,
             group_by=case["group_by"],
