@@ -1,4 +1,5 @@
 from odoo import api, fields, models
+from odoo.exceptions import AccessError
 
 
 class StydOdooBridgeStatus(models.TransientModel):
@@ -67,6 +68,7 @@ class StydOdooBridgeStatus(models.TransientModel):
         Each section is guarded independently so a failure in one source can
         never blank the rest of the page or raise to the UI.
         """
+        self._check_admin()  # also reached through onchange() on a new record
         service = self.env["styd.odoo.bridge.service"]
         access_log = self.env["styd.odoo.bridge.access.log"].sudo()
 
@@ -118,7 +120,7 @@ class StydOdooBridgeStatus(models.TransientModel):
             except Exception:
                 record.database_uuid = False
             try:
-                record.supported_features = ", ".join(service.get_supported_features() or []) or False
+                record.supported_features = ", ".join(service._get_supported_features() or []) or False
             except Exception:
                 record.supported_features = False
 
@@ -137,8 +139,15 @@ class StydOdooBridgeStatus(models.TransientModel):
                 record.audit_error_count = 0
                 record.audit_last_access = False
 
+    def _check_admin(self):
+        """Buttons and form values are for Odoo administrators only: they run
+        through sudo helpers, so an RPC call by anyone else is refused."""
+        if not (self.env.su or self.env.user._is_system()):
+            raise AccessError("Only an Odoo administrator can manage the Speak To Your Database Bridge.")
+
     def action_refresh_status(self):
         """Reload the status page only -- no side effects."""
+        self._check_admin()
         return {
             "type": "ir.actions.act_window",
             "name": "Bridge Status",
@@ -149,12 +158,14 @@ class StydOdooBridgeStatus(models.TransientModel):
 
     def action_open_access_logs(self):
         """Open the existing read-only access-log list view."""
+        self._check_admin()
         return self.env["ir.actions.actions"]._for_xml_id(
             "styd_odoo_bridge.action_styd_bridge_access_log"
         )
 
     def action_open_connection_setup(self):
         """Open the Connection Setup page (token generate / rotate / revoke)."""
+        self._check_admin()
         return self.env["ir.actions.actions"]._for_xml_id(
             "styd_odoo_bridge.action_styd_bridge_setup"
         )
