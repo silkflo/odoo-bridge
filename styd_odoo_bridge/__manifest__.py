@@ -11,10 +11,13 @@
     "license": "LGPL-3",
     "depends": ["base"],
     "data": [
+        "security/styd_bridge_channel_security.xml",
         "security/ir.model.access.csv",
+        "data/ir_cron_channel.xml",
         "views/res_config_settings_views.xml",
         "views/bridge_access_log_views.xml",
         "views/bridge_setup_views.xml",
+        "views/bridge_channel_views.xml",
     ],
     "installable": True,
     "application": True,

@@ -1,5 +1,3 @@
-import datetime
-import decimal
 import hashlib
 import hmac
 import json
@@ -11,24 +9,10 @@ from odoo.http import request
 from odoo.addons.styd_odoo_bridge.models.bridge_orm import (
     ORM_ACCESS_MODE,
     StydOrmError,
+    _json_default,
 )
 
 _logger = logging.getLogger(__name__)
-
-
-def _json_default(value):
-    """Best-effort JSON serializer for ORM values (dates, bytes, Decimal).
-
-    Existing Phase 1-3 payloads contain only plain JSON types, so this is never
-    invoked for them and their serialized output is byte-for-byte unchanged.
-    """
-    if isinstance(value, (datetime.datetime, datetime.date)):
-        return value.isoformat()
-    if isinstance(value, (bytes, bytearray, memoryview)):
-        return None
-    if isinstance(value, decimal.Decimal):
-        return float(value)
-    return str(value)
 
 
 class StydBridgeApi(http.Controller):
@@ -231,26 +215,7 @@ class StydBridgeApi(http.Controller):
         return request.env["styd.odoo.bridge.service"].sudo()
 
     def _build_user_search_payload(self, service, query):
-        directory = service.build_user_directory_snapshot_payload()
-        users = directory.get("users", [])
-
-        q = str(query or "").strip().lower()
-        if q:
-            users = [
-                user for user in users
-                if q in str(user.get("login") or "").lower()
-                or q in str(user.get("name") or "").lower()
-                or q in str(user.get("email") or "").lower()
-            ]
-
-        return {
-            "bridge_version": directory.get("bridge_version"),
-            "snapshot_version": directory.get("snapshot_version"),
-            "generated_at_utc": directory.get("generated_at_utc"),
-            "query": query or "",
-            "count": len(users),
-            "users": users,
-        }
+        return service.build_user_search_payload(query)
 
     @http.route(
         "/styd_bridge/v1/health",

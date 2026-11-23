@@ -2,3 +2,7 @@ from . import test_connection_setup
 from . import test_orm_bridge
 from . import test_token_migration
 from . import test_tz_bridge
+from . import test_channel_protocol
+from . import test_channel_core
+from . import test_channel_executor
+from . import test_channel_pairing

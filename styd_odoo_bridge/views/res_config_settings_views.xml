@@ -41,6 +41,22 @@
                                 options="{'no_create': True}"
                             />
                         </setting>
+
+                        <setting
+                            string="Only members of the STYD group"
+                            help="Outbound channel: off (default), Speak To Your Database may answer as any active internal user, administrators included. On: only as users in the group Speak To Your Database: member."
+                            id="styd_bridge_channel_restrict_group_setting"
+                        >
+                            <field name="styd_bridge_channel_restrict_group"/>
+                        </setting>
+
+                        <setting
+                            string="Custom CA bundle (outbound channel)"
+                            help="Path of a PEM file of trusted authorities, for a proxy that inspects TLS. The certificate is always checked."
+                            id="styd_bridge_channel_ca_bundle_setting"
+                        >
+                            <field name="styd_bridge_channel_ca_bundle" placeholder="/etc/ssl/certs/corporate-ca.pem"/>
+                        </setting>
                     </block>
                 </app>
             </xpath>

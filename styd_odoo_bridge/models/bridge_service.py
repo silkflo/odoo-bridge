@@ -341,6 +341,14 @@ class StydOdooBridgeService(models.AbstractModel):
         return True
 
     def _get_connector_owner_user_id(self):
+        # The outbound channel runs owner-only reads for the pairing's own owner
+        # (the connector owner chosen at pairing), passed in the context.
+        channel_owner = self.env.context.get("styd_bridge_connector_owner_uid")
+        if channel_owner:
+            try:
+                return int(channel_owner)
+            except Exception:
+                return None
         raw = self._get_icp().get_param("styd_odoo_bridge.connector_owner_user_id", default="")
         if not raw:
             return None
@@ -971,6 +979,29 @@ class StydOdooBridgeService(models.AbstractModel):
             "snapshot_version": 1,
             "generated_at_utc": self._utc_now_iso(),
             "users": self._build_user_directory_payload(),
+        }
+
+    def build_user_search_payload(self, query):
+        """/users/search body: the directory filtered on login, name or email."""
+        directory = self.build_user_directory_snapshot_payload()
+        users = directory.get("users", [])
+
+        q = str(query or "").strip().lower()
+        if q:
+            users = [
+                user for user in users
+                if q in str(user.get("login") or "").lower()
+                or q in str(user.get("name") or "").lower()
+                or q in str(user.get("email") or "").lower()
+            ]
+
+        return {
+            "bridge_version": directory.get("bridge_version"),
+            "snapshot_version": directory.get("snapshot_version"),
+            "generated_at_utc": directory.get("generated_at_utc"),
+            "query": query or "",
+            "count": len(users),
+            "users": users,
         }
 
     def build_capability_snapshot_payload(self):

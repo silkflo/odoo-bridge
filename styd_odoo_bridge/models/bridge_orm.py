@@ -1,4 +1,5 @@
 import datetime
+import decimal
 
 from odoo import models
 
@@ -6,6 +7,14 @@ from . import bridge_tz
 
 # Access mode reported on every ORM response (MVP policy: sudo + company scope).
 ORM_ACCESS_MODE = "sudo_company_scoped"
+
+# Access mode of the outbound channel's answers: the read ran as the asking
+# member's own Odoo user, under that user's access rights and record rules.
+ORM_MEMBER_ACCESS_MODE = "member_rights"
+
+# Context key the channel executor sets: the ORM primitives below then read as
+# env.user (no sudo) and scope companies to env.companies (the member's own).
+ORM_MEMBER_RIGHTS_CTX = "styd_bridge_member_rights"
 
 # Datetime values in search-read records, when a tz is applied (tz_aware_v1).
 ORM_TZ_DATETIME_FORMAT = "iso8601_offset"
@@ -131,6 +140,21 @@ ORM_MAX_GROUP_BY = 2
 ORM_MAX_AGGREGATES = 5
 
 
+def _json_default(value):
+    """Best-effort JSON serializer for ORM values (dates, bytes, Decimal).
+
+    Existing Phase 1-3 payloads contain only plain JSON types, so this is never
+    invoked for them and their serialized output is byte-for-byte unchanged.
+    """
+    if isinstance(value, (datetime.datetime, datetime.date)):
+        return value.isoformat()
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return None
+    if isinstance(value, decimal.Decimal):
+        return float(value)
+    return str(value)
+
+
 class StydOrmError(Exception):
     def __init__(self, code, message):
         self.code = code
@@ -164,7 +188,18 @@ class StydOdooBridgeOrm(models.AbstractModel):
     MAX_GROUP_BY = ORM_MAX_GROUP_BY
     MAX_AGGREGATES = ORM_MAX_AGGREGATES
 
+    def _orm_member_rights(self):
+        """True when the outbound channel runs this read as the member (no sudo)."""
+        return bool(self.env.context.get(ORM_MEMBER_RIGHTS_CTX))
+
+    def _orm_base(self, model_name):
+        """The model to read: sudo for the HTTP routes, the member's own env for the channel."""
+        model = self.env[model_name]
+        return model if self._orm_member_rights() else model.sudo()
+
     def _orm_check_model(self, model_name):
+        if not isinstance(model_name, str):
+            raise StydOrmError("model_not_allowed", "Model is not allowed by this bridge.")
         if not model_name or model_name not in self.MODEL_ALLOWLIST:
             raise StydOrmError("model_not_allowed", "Model is not allowed by this bridge.")
         # Graceful degradation: the model is allowlisted but its Odoo app is not
@@ -189,6 +224,9 @@ class StydOdooBridgeOrm(models.AbstractModel):
         return False
 
     def _orm_scope_companies(self):
+        if self._orm_member_rights():
+            # The channel sets allowed_company_ids to the member's companies.
+            return self.env.companies
         service = self.env["styd.odoo.bridge.service"]
         owner_id = None
         try:
@@ -519,19 +557,24 @@ class StydOdooBridgeOrm(models.AbstractModel):
         for model_name in sorted(self.MODEL_ALLOWLIST):
             if model_name not in self.env:
                 continue
-            model = self.env[model_name].sudo()
+            model = self._orm_base(model_name)
+            allowed = True
+            if self._orm_member_rights():
+                allowed = bool(model.check_access_rights("read", raise_exception=False))
             out.append({
                 "model": model_name,
                 "name": model_name,
                 "label": model._description or model_name,
                 "transient": bool(model._transient),
-                "allowed": True,
+                "allowed": allowed,
             })
         return out
 
     def orm_model_fields(self, model_name):
         self._orm_check_model(model_name)
-        model = self.env[model_name].sudo()
+        model = self._orm_base(model_name)
+        if self._orm_member_rights():
+            model.check_access_rights("read")
         meta = model.fields_get()
         out = []
         for fname in sorted(meta):
@@ -558,7 +601,9 @@ class StydOdooBridgeOrm(models.AbstractModel):
     def orm_search_read(self, model, domain=None, fields=None, limit=None, offset=None, order=None,
                         tz=None, tz_mode=None):
         self._orm_check_model(model)
-        base = self.env[model].sudo()
+        base = self._orm_base(model)
+        if self._orm_member_rights():
+            base.check_access_rights("read")
         meta = base.fields_get()
 
         safe_fields = self._orm_validate_fields(meta, fields)
@@ -600,7 +645,9 @@ class StydOdooBridgeOrm(models.AbstractModel):
     def orm_read_group(self, model, domain=None, group_by=None, aggregates=None, limit=None, order=None,
                        tz=None, tz_mode=None):
         self._orm_check_model(model)
-        base = self.env[model].sudo()
+        base = self._orm_base(model)
+        if self._orm_member_rights():
+            base.check_access_rights("read")
         meta = base.fields_get()
 
         valid_group_by = self._orm_validate_group_by(meta, group_by)

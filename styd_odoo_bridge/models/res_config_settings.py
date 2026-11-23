@@ -1,4 +1,5 @@
-from odoo import fields, models
+from odoo import _, fields, models
+from odoo.exceptions import UserError
 
 
 class ResConfigSettings(models.TransientModel):
@@ -23,6 +24,21 @@ class ResConfigSettings(models.TransientModel):
         compute="_compute_styd_bridge_token_configured",
         help="Whether a bridge token is configured. The token is generated and "
              "rotated from Speak To Your Database Bridge > Connection Setup and is never shown here.",
+    )
+
+    # Outbound channel (connect without opening a port).
+    styd_bridge_channel_restrict_group = fields.Boolean(
+        string="Only members of the STYD group",
+        config_parameter="styd_odoo_bridge.channel_restrict_to_group",
+        help="Off (default): Speak To Your Database may answer as any active internal Odoo "
+             "user, administrators included. On: only as users in the group "
+             "'Speak To Your Database: member'.",
+    )
+    styd_bridge_channel_ca_bundle = fields.Char(
+        string="Custom CA bundle (outbound channel)",
+        config_parameter="styd_odoo_bridge.channel_ca_bundle",
+        help="Path of a PEM file of trusted certificate authorities, for a proxy that "
+             "inspects TLS. Empty: the system's authorities. The certificate is always checked.",
     )
 
     def _compute_styd_bridge_token_configured(self):
@@ -58,6 +74,12 @@ class ResConfigSettings(models.TransientModel):
         return res
 
     def set_values(self):
+        from .bridge_channel import resolve_verify
+        for record in self:
+            try:
+                resolve_verify(record.styd_bridge_channel_ca_bundle)
+            except ValueError as exc:
+                raise UserError(_("Custom CA bundle: %s", exc))
         super().set_values()
         service = self.env["styd.odoo.bridge.service"]
 
