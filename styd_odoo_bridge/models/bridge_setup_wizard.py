@@ -1,6 +1,7 @@
 import secrets
 
 from odoo import api, fields, models
+from odoo.exceptions import AccessError
 
 
 class StydOdooBridgeSetupWizard(models.TransientModel):
@@ -48,8 +49,15 @@ class StydOdooBridgeSetupWizard(models.TransientModel):
     )
     has_generated_token = fields.Boolean(compute="_compute_generated_token")
 
+    def _check_admin(self):
+        """Buttons and form values are for Odoo administrators only: they run
+        through sudo helpers, so an RPC call by anyone else is refused."""
+        if not (self.env.su or self.env.user._is_system()):
+            raise AccessError("Only an Odoo administrator can manage the Speak To Your Database Bridge.")
+
     @api.model
     def default_get(self, fields_list):
+        self._check_admin()
         res = super().default_get(fields_list)
         service = self.env["styd.odoo.bridge.service"]
         try:
@@ -159,21 +167,25 @@ class StydOdooBridgeSetupWizard(models.TransientModel):
     # Buttons
     # ------------------------------------------------------------------
     def action_save_settings(self):
+        self._check_admin()
         self.ensure_one()
         self._persist_settings()
         return self._reopen()
 
     def action_generate_token(self):
+        self._check_admin()
         self.ensure_one()
         self._persist_settings()
         return self._issue_new_token()
 
     def action_rotate_token(self):
+        self._check_admin()
         self.ensure_one()
         self._persist_settings()
         return self._issue_new_token()
 
     def action_revoke_token(self):
+        self._check_admin()
         self.ensure_one()
         self._set_param("styd_odoo_bridge.token_hash", "")
         self._set_param("styd_odoo_bridge.token", "")
@@ -182,6 +194,7 @@ class StydOdooBridgeSetupWizard(models.TransientModel):
         return self._reopen()
 
     def action_open_access_logs(self):
+        self._check_admin()
         return self.env["ir.actions.actions"]._for_xml_id(
             "styd_odoo_bridge.action_styd_bridge_access_log"
         )

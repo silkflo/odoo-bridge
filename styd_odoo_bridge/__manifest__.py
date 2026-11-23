@@ -1,6 +1,6 @@
 {
     "name": "Odoo MCP Connector for ChatGPT and Claude | Speak To Your Database",
-    "version": "17.0.0.10.1",
+    "version": "17.0.0.10.2",
     "summary": "Connect Odoo to ChatGPT and Claude. Ask questions in plain words and get read-only answers on sales, invoices, stock, CRM and projects. Works with an Odoo API key, no module needed, or with this Bridge for per-user access.",
     "category": "Tools",
     "author": "Speak To Your Database",
