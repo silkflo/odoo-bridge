@@ -514,7 +514,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
             orderby=order,
         )
 
-    def orm_list_models(self):
+    def _orm_list_models(self):
         out = []
         for model_name in sorted(self.MODEL_ALLOWLIST):
             if model_name not in self.env:
@@ -529,7 +529,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
             })
         return out
 
-    def orm_model_fields(self, model_name):
+    def _orm_model_fields(self, model_name):
         self._orm_check_model(model_name)
         model = self.env[model_name].sudo()
         meta = model.fields_get()
@@ -555,7 +555,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
             })
         return out
 
-    def orm_search_read(self, model, domain=None, fields=None, limit=None, offset=None, order=None,
+    def _orm_search_read(self, model, domain=None, fields=None, limit=None, offset=None, order=None,
                         tz=None, tz_mode=None):
         self._orm_check_model(model)
         base = self.env[model].sudo()
@@ -597,7 +597,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
             result["datetime_format"] = ORM_TZ_DATETIME_FORMAT
         return result
 
-    def orm_read_group(self, model, domain=None, group_by=None, aggregates=None, limit=None, order=None,
+    def _orm_read_group(self, model, domain=None, group_by=None, aggregates=None, limit=None, order=None,
                        tz=None, tz_mode=None):
         self._orm_check_model(model)
         base = self.env[model].sudo()
