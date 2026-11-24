@@ -2,4 +2,12 @@ from . import test_connection_setup
 from . import test_orm_bridge
 from . import test_token_migration
 from . import test_tz_bridge
+from . import test_channel_protocol
+from . import test_channel_core
+from . import test_channel_executor
+from . import test_channel_pairing
 from . import test_rpc_access
+from . import test_read_policy
+from . import test_hr_read
+from . import test_discuss
+from . import test_channel_settings

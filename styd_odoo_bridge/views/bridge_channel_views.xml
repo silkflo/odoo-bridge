@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Connect without opening a port: pair this database with a STYD workspace
+         over the outbound channel. The secret is never shown; the code is shown once. -->
+    <record id="view_styd_bridge_channel_wizard_form" model="ir.ui.view">
+        <field name="name">styd.odoo.bridge.channel.wizard.form</field>
+        <field name="model">styd.odoo.bridge.channel.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Speak To Your Database &#8212; Connect without opening a port">
+                <header>
+                    <button name="action_show_code" type="object" string="Show pairing code"
+                            class="btn-primary" invisible="has_pair_code"/>
+                    <button name="action_cancel_code" type="object" string="Cancel the code"
+                            invisible="not has_pair_code"/>
+                    <button name="action_refresh" type="object" string="Refresh"/>
+                </header>
+                <sheet>
+                    <field name="has_pair_code" invisible="1"/>
+                    <field name="bridge_enabled" invisible="1"/>
+                    <div class="oe_title">
+                        <h1>Connect without opening a port</h1>
+                        <p class="text-muted">
+                            Odoo opens a secure connection out to Speak To Your Database. You open no
+                            port, need no public address and change no firewall. Questions are answered
+                            as each member's own Odoo user, read-only.
+                        </p>
+                    </div>
+
+                    <div class="alert alert-warning" role="alert" invisible="bridge_enabled">
+                        The Bridge is switched off. Enable it in <strong>Connection Setup</strong> first.
+                    </div>
+
+                    <div class="alert alert-success" role="alert" invisible="not has_pair_code">
+                        <h3 class="mb-1">Type this code in Speak To Your Database within 15 minutes:</h3>
+                        <h1><field name="pair_code" readonly="1" nolabel="1"/></h1>
+                        <p class="mb-0">
+                            Open Speak To Your Database &#8594; Settings &#8594; Connections, choose
+                            <strong>Connect without opening a port</strong> and type the code.
+                            It is shown only once and works once. Click <strong>Refresh</strong> to see
+                            the pairing appear below.
+                        </p>
+                    </div>
+
+                    <group string="Pairing">
+                        <field name="owner_user_id" options="{'no_create': True}"/>
+                    </group>
+
+                    <separator string="Pairings"/>
+                    <field name="pairings_html" nolabel="1" readonly="1"/>
+                    <group>
+                        <field name="pairing_choice"/>
+                    </group>
+                    <div>
+                        <button name="action_rotate" type="object" string="Rotate the secret"
+                                class="btn-secondary me-2"/>
+                        <button name="action_unpair" type="object" string="Unpair"
+                                class="btn-danger me-2"
+                                confirm="Unpairing disconnects this STYD workspace from Odoo. Continue?"/>
+                        <button name="action_forget" type="object" string="Remove an unpaired row"
+                                class="btn-link"/>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_styd_bridge_channel" model="ir.actions.act_window">
+        <field name="name">Connect without opening a port</field>
+        <field name="res_model">styd.odoo.bridge.channel.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_styd_bridge_channel_wizard_form"/>
+        <field name="target">current</field>
+        <field name="context">{}</field>
+    </record>
+
+    <menuitem id="menu_styd_bridge_channel"
+              name="Connect without opening a port"
+              parent="menu_styd_bridge_root"
+              action="action_styd_bridge_channel"
+              groups="base.group_system"
+              sequence="8"/>
+</odoo>
