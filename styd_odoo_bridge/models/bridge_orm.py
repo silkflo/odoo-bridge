@@ -102,7 +102,8 @@ ORM_MODEL_ALLOWLIST = frozenset({
 
     # M-R2: every model STYD reads on an API key (odooReadPolicy.ts and its
     # area lists), so one add-on upgrade covers them. STYD's switches keep
-    # deciding what is used. HR stays out (a separate owner decision).
+    # deciding what is used. HR is not here: it has its own walled list
+    # (ORM_HR_FIELDS, M-R6), read over the channel only.
     # Point of Sale
     "pos.order",
     "pos.order.line",
@@ -134,6 +135,67 @@ ORM_MODEL_ALLOWLIST = frozenset({
     # Currency rates (thresholds named in another currency)
     "res.currency.rate",
 })
+
+# M-R6: HR, exactly what STYD reads on an API key (odooHrAccess.ts
+# ODOO_HR_FIELDS), with the same fields left out: a per-model field ALLOWLIST,
+# never a denylist. Every field a read touches (returned, filtered, ordered,
+# grouped, summed) must be listed; a read must name its fields. mobile_phone,
+# every pay, cost or private field stays out for everyone: the wall takes no
+# role, so no role opens it.
+# These models are read over the outbound channel ONLY, as the asking member's
+# own Odoo user (no sudo, read-only cursor): the HTTP routes (sudo) refuse them
+# with model_not_allowed. hr.employee itself stays out for good
+# (hr.employee.public is the view with no private column).
+ORM_HR_FIELDS = {
+    "hr.employee.public": (
+        "id", "name", "active", "department_id", "job_id", "job_title", "parent_id", "company_id",
+        "work_email", "work_phone", "user_id", "tz",
+    ),
+    "hr.department": ("id", "name", "complete_name", "parent_id", "manager_id", "company_id", "active"),
+    # start_datetime / stop_datetime on 15 to 19, request_date_from / request_date_to on 20.
+    # Never the type or the description.
+    "hr.leave.report.calendar": (
+        "id", "employee_id", "department_id", "company_id", "state", "duration", "start_datetime",
+        "stop_datetime", "request_date_from", "request_date_to",
+    ),
+    # holiday_status_id on 15 to 19, work_entry_type_id on 20.
+    "hr.leave": (
+        "id", "employee_id", "department_id", "employee_company_id", "user_id", "request_date_from",
+        "request_date_to", "date_from", "date_to", "number_of_days", "number_of_hours",
+        "number_of_hours_display", "state", "holiday_status_id", "work_entry_type_id",
+    ),
+    "hr.leave.type": ("id", "name", "time_type", "requires_allocation", "unpaid", "company_id", "active"),
+    "hr.work.entry.type": (
+        "id", "name", "count_as", "requires_allocation", "unpaid", "time_off_selectable", "active",
+    ),
+    "hr.leave.allocation": (
+        "id", "employee_id", "employee_company_id", "number_of_days", "max_leaves", "leaves_taken",
+        "date_from", "date_to", "state", "holiday_status_id", "work_entry_type_id", "type_request_unit",
+    ),
+    "hr.attendance": ("id", "employee_id", "check_in", "check_out", "worked_hours"),
+}
+ORM_HR_MODELS = frozenset(ORM_HR_FIELDS)
+
+# STYD's company scope per HR model (odooHrAccess.ts ODOO_HR_COMPANY_SCOPE):
+# (field, rows with no company allowed). None: configuration with no company.
+# "employees": scoped through the employee's company (attendance).
+ORM_HR_COMPANY_SCOPE = {
+    "hr.employee.public": ("company_id", False),
+    "hr.department": ("company_id", True),
+    "hr.leave.report.calendar": ("company_id", False),
+    # Not company_id: it is not always the employee's.
+    "hr.leave": ("employee_company_id", False),
+    "hr.leave.allocation": ("employee_company_id", False),
+    "hr.leave.type": ("company_id", True),
+    "hr.work.entry.type": None,
+    "hr.attendance": "employees",
+}
+
+# Pay on an analytic line: a timesheet line's `amount` is the employee's cost.
+# It is read only on journal-item lines (STYD's ledger reader), so a read that
+# touches it must carry ["move_line_id", "!=", False] at the top level of a
+# plain AND domain (never under an "|" or "!" that could undo it).
+ORM_PAY_ON_LINES = {"account.analytic.line": frozenset({"amount"})}
 # A field is forbidden if its lowercased name CONTAINS any of these substrings.
 ORM_FORBIDDEN_FIELD_SUBSTRINGS = (
     "password", "passwd", "token", "api_key", "secret", "oauth",
@@ -258,6 +320,15 @@ class StydOdooBridgeOrm(models.AbstractModel):
     def _orm_check_model(self, model_name):
         if not isinstance(model_name, str):
             raise StydOrmError("model_not_allowed", "Model is not allowed by this bridge.")
+        if model_name in ORM_HR_MODELS:
+            # M-R6: HR only as the asking member, over the outbound channel.
+            if not self._orm_member_rights():
+                raise StydOrmError(
+                    "model_not_allowed",
+                    "HR is read over the outbound channel only, as the asking member's own Odoo user.")
+            if model_name not in self.env:
+                raise StydOrmError("model_not_installed", "Model is not installed on this Odoo instance.")
+            return
         if not model_name or model_name not in self.MODEL_ALLOWLIST:
             raise StydOrmError("model_not_allowed", "Model is not allowed by this bridge.")
         # Graceful degradation: the model is allowlisted but its Odoo app is not
@@ -299,9 +370,79 @@ class StydOdooBridgeOrm(models.AbstractModel):
 
     def _orm_company_domain(self, model_name, companies):
         model = self.env[model_name].sudo()
+        if model_name in ORM_HR_COMPANY_SCOPE:
+            return self._orm_hr_company_domain(model_name, model, companies)
         if "company_id" in model._fields:
             return ["|", ("company_id", "=", False), ("company_id", "in", companies.ids)]
         return []
+
+    # ------------------------------------------------------------------
+    # M-R6: the HR wall (odooHrAccess.ts) and pay on analytic lines
+    # ------------------------------------------------------------------
+    def _orm_hr_company_domain(self, model_name, model, companies):
+        """STYD's company scope for an HR model (on top of Odoo's own rules)."""
+        scope = ORM_HR_COMPANY_SCOPE[model_name]
+        if scope is None:
+            return []
+        if scope == "employees":
+            # The employees of the read's companies, archived ones included (their
+            # rows stay theirs), read as the member through hr.employee.public.
+            employees = self.env["hr.employee.public"].with_context(active_test=False)._search(
+                [("company_id", "in", companies.ids)])
+            return [("employee_id", "in", employees)]
+        field, allow_empty = scope
+        if field not in model._fields:
+            field, allow_empty = "company_id", True
+            if field not in model._fields:
+                return []
+        if allow_empty:
+            return ["|", (field, "=", False), (field, "in", companies.ids)]
+        return [(field, "in", companies.ids)]
+
+    def _orm_hr_require_named(self, model, named):
+        if model in ORM_HR_MODELS and not named:
+            raise StydOrmError("field_not_allowed", "An HR read must name its fields.")
+
+    def _orm_touched(self, fields=(), domain=(), order=None, group_by=(), agg_names=()):
+        """Every field a VALIDATED read touches (returned, filtered, ordered, grouped, summed)."""
+        touched = list(fields or ()) + list(group_by or ()) + list(agg_names or ())
+        touched += [leaf[0] for leaf in (domain or ()) if not isinstance(leaf, str)]
+        for term in (order or "").split(","):
+            if term.strip():
+                touched.append(term.split()[0])
+        return touched
+
+    def _orm_journal_items_only(self, domain):
+        """A plain AND domain (no "|" or "!") with ["move_line_id", "!=", False]."""
+        leaves = domain or []
+        plain = not any(isinstance(t, str) and t in ("|", "!") for t in leaves)
+        return plain and any(
+            not isinstance(t, str) and t[0] == "move_line_id" and t[1] == "!=" and t[2] is False
+            for t in leaves)
+
+    def _orm_default_fields_without_pay(self, model, fields, safe_fields, domain):
+        """A read naming no field gets every returnable field, minus pay it may
+        not read (named, the same field is refused)."""
+        pay = ORM_PAY_ON_LINES.get(model)
+        if fields or not pay or self._orm_journal_items_only(domain):
+            return safe_fields
+        return [f for f in safe_fields if f not in pay]
+
+    def _orm_check_walls(self, model, domain, touched):
+        """The HR field wall, then pay on analytic lines. Called after the
+        validators, on their normalised output."""
+        allowed = ORM_HR_FIELDS.get(model)
+        if allowed is not None:
+            for fname in touched:
+                if fname not in allowed:
+                    raise StydOrmError("field_not_allowed", "Field not allowed for HR: %s." % _short(fname))
+        pay = ORM_PAY_ON_LINES.get(model)
+        if pay and pay.intersection(touched):
+            if not self._orm_journal_items_only(domain):
+                raise StydOrmError(
+                    "field_not_allowed",
+                    "Field not allowed: %s (read only on journal-item lines: "
+                    "add [\"move_line_id\", \"!=\", false])." % _short(sorted(pay.intersection(touched))[0]))
 
     def _orm_m2m_pair(self, table, model, field, info):
         """True when (model, field) is the named pair of ``table``, as a stored
@@ -675,7 +816,10 @@ class StydOdooBridgeOrm(models.AbstractModel):
 
     def _orm_list_models(self):
         out = []
-        for model_name in sorted(self.MODEL_ALLOWLIST):
+        # M-R6: HR models are listed only over the channel (as the member); the
+        # sudo routes never list or read them.
+        names = self.MODEL_ALLOWLIST | ORM_HR_MODELS if self._orm_member_rights() else self.MODEL_ALLOWLIST
+        for model_name in sorted(names):
             if model_name not in self.env:
                 continue
             model = self._orm_base(model_name)
@@ -697,10 +841,13 @@ class StydOdooBridgeOrm(models.AbstractModel):
         if self._orm_member_rights():
             model.check_access_rights("read")
         meta = model.fields_get()
+        hr_allowed = ORM_HR_FIELDS.get(model_name)
         out = []
         for fname in sorted(meta):
             if self._orm_is_forbidden_field(fname):
                 continue
+            if hr_allowed is not None and fname not in hr_allowed:
+                continue  # M-R6: only the wall's fields are described
             info = meta[fname]
             ftype = info.get("type")
             out.append({
@@ -727,9 +874,12 @@ class StydOdooBridgeOrm(models.AbstractModel):
             base.check_access_rights("read")
         meta = base.fields_get()
 
+        self._orm_hr_require_named(model, fields)
         safe_fields = self._orm_validate_fields(meta, fields, model=model)
         valid_domain = self._orm_validate_domain(meta, domain, model=model)
         valid_order = self._orm_validate_order(meta, order)
+        safe_fields = self._orm_default_fields_without_pay(model, fields, safe_fields, valid_domain)
+        self._orm_check_walls(model, valid_domain, self._orm_touched(safe_fields, valid_domain, valid_order))
         resolved_limit = self._orm_resolve_limit(limit)
         resolved_offset = self._orm_resolve_offset(offset)
         resolved_tz = self._orm_resolve_tz(tz, tz_mode)
@@ -770,11 +920,14 @@ class StydOdooBridgeOrm(models.AbstractModel):
             base.check_access_rights("read")
         meta = base.fields_get()
 
+        self._orm_hr_require_named(model, group_by or aggregates)
         valid_group_by = self._orm_validate_group_by(meta, group_by, model=model)
         agg_specs, agg_names = self._orm_validate_aggregates(meta, aggregates)
         valid_domain = self._orm_validate_domain(meta, domain, model=model)
         resolved_limit = self._orm_resolve_limit(limit)
         valid_order = self._orm_validate_group_order(order, valid_group_by, agg_names)
+        self._orm_check_walls(model, valid_domain, self._orm_touched(
+            (), valid_domain, valid_order, valid_group_by, agg_names))
         resolved_tz = self._orm_resolve_tz(tz, tz_mode)
         resolved_lang = self._orm_resolve_lang(lang)
         valid_domain = self._orm_localize_domain(meta, valid_domain, resolved_tz)

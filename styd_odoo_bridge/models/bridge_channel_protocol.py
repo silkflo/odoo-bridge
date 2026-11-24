@@ -49,6 +49,15 @@ CONTROL_OP_FOR_T = {
     "unpaired": "control.unpaired",
 }
 
+# Discuss assistant (docs/DISCUSS_CONTRACT.md in this repository): messages from
+# the hub that deliver an answer. Same envelope and signature as a request; the
+# op is fixed by the "t" and member_uid is the asking Odoo user (>= 1).
+DISCUSS_OP_FOR_T = {
+    "discuss_answer": "discuss.answer",
+}
+# Additive capabilities announced in hello.features (the hub ignores unknown ones).
+FEATURES = ("discuss.v1",)
+
 TS_WINDOW_MS = 120_000
 REPLAY_TTL_MS = 300_000
 REPLAY_MAX = 10_000
@@ -69,6 +78,7 @@ UP_HEADERS = {
 PAIRING_ID_RE = re.compile(r"^bp_[A-Za-z0-9_-]{22}$")
 PAIR_SESSION_RE = re.compile(r"^ps_[A-Za-z0-9_-]{22}$")
 ROTATION_ID_RE = re.compile(r"^rt_[A-Za-z0-9_-]{22}$")
+QUESTION_ID_RE = re.compile(r"^dq_[A-Za-z0-9_-]{22}$")
 REQUEST_ID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 NONCE_RE = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -120,6 +130,10 @@ def sig_equal(given, expected):
 
 def new_nonce():
     return base64.urlsafe_b64encode(secrets.token_bytes(16)).decode("ascii").rstrip("=")
+
+
+def new_question_id():
+    return "dq_" + base64.urlsafe_b64encode(secrets.token_bytes(16)).decode("ascii").rstrip("=")
 
 
 def new_instance_id():
@@ -328,7 +342,10 @@ def parse_envelope_shape(msg):
         raise ChannelError("bad_message", "sig")
     op = fields["op"]
     if t == "request":
-        if op.startswith("control."):
+        if op.startswith("control.") or op in DISCUSS_OP_FOR_T.values():
+            raise ChannelError("bad_message", "t and op disagree")
+    elif t in DISCUSS_OP_FOR_T:
+        if op != DISCUSS_OP_FOR_T[t] or fields["member_uid"] < 1:
             raise ChannelError("bad_message", "t and op disagree")
     elif t in CONTROL_OP_FOR_T:
         if op != CONTROL_OP_FOR_T[t] or fields["member_uid"] != 0:

@@ -384,6 +384,7 @@ class PairingStream:
             "odoo_series": info["odoo_series"],
             "db_uuid": info["db_uuid"],
             "ops": list(proto.OPS),
+            "features": list(proto.FEATURES),
             "instance": self.instance,
         }
 
@@ -462,7 +463,7 @@ class PairingStream:
         if t == "version":
             self.version = msg
             return
-        if t not in ("request",) + tuple(proto.CONTROL_OP_FOR_T):
+        if t not in ("request",) + tuple(proto.CONTROL_OP_FOR_T) + tuple(proto.DISCUSS_OP_FOR_T):
             return  # unknown t: ignored (forward compatibility)
         try:
             fields, args = proto.check_envelope(
@@ -483,6 +484,9 @@ class PairingStream:
                 return
             if not self.runner.executor.try_submit(self._run_request, fields, args, msg.get("timeout_ms")):
                 self._spawn(self.post_results, [executor_mod.refusal(fields["id"], "busy", "The Odoo module is busy.")])
+            return
+        if t == "discuss_answer":
+            self._spawn(self.handle_discuss_answer, fields, args)
             return
         if t == "ping":
             self._spawn(self.post_event, {"t": "event", "kind": "pong", "id": fields["id"]})
@@ -585,6 +589,16 @@ class PairingStream:
             self._switch_secret(pending, current)
             _logger.info("STYD channel: the hub uses the new secret; switched (pairing %s)", self.pairing_id)
 
+    # -- Discuss assistant: an answer arrives (docs/DISCUSS_CONTRACT.md) -----------
+    def handle_discuss_answer(self, fields, args):
+        """Store a verified answer for the Discuss job and wake it; never posts
+        in Discuss from this thread. Tells the hub what became of it."""
+        code, question_id = discuss_deliver(self.runner.registry, self.pairing_id, fields["member_uid"], args)
+        self.post_event({
+            "t": "event", "kind": "discuss.delivered", "id": fields["id"],
+            "question_id": question_id, "ok": code == "ok", "code": code,
+        })
+
     # -- unpaired from STYD (section 6.7) -----------------------------------------
     def handle_unpaired(self):
         _logger.info("STYD channel: STYD unpaired this database (pairing %s)", self.pairing_id)
@@ -595,6 +609,22 @@ class PairingStream:
 
 def _timedelta_ms(ms):
     return datetime.timedelta(milliseconds=ms)
+
+
+def discuss_deliver(registry, pairing_id, member_uid, args):
+    """Hand a verified ``discuss_answer`` to the Discuss inbox, on its own cursor.
+    Returns ``(code, question_id)``; code "ok" when stored."""
+    question_id = args.get("question_id") if isinstance(args, dict) else None
+    question_id = question_id if isinstance(question_id, str) and proto.QUESTION_ID_RE.match(question_id) else None
+    try:
+        with registry.cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            if "styd.discuss.inbox" not in env:
+                return "discuss_unavailable", question_id
+            return env["styd.discuss.inbox"].sudo()._deliver(pairing_id, member_uid, args), question_id
+    except Exception:
+        _logger.exception("STYD discuss: could not store an answer")
+        return "module_error", question_id
 
 
 # ---------------------------------------------------------------------------

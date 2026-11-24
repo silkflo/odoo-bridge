@@ -11,6 +11,7 @@ from odoo.tests import tagged
 
 from odoo.addons.styd_odoo_bridge.models import bridge_channel_executor as ex
 from odoo.addons.styd_odoo_bridge.models import bridge_channel_protocol as proto
+from odoo.addons.styd_odoo_bridge.models.bridge_orm import ORM_HR_MODELS
 
 from .channel_common import ChannelCase
 
@@ -97,7 +98,9 @@ class TestChannelExecutor(ChannelCase):
         orm = self.env["styd.odoo.bridge.orm"].sudo()
         out = self.run_op("orm.models", member=self.admin)
         self.assertEqual(out["body"]["access_mode"], "member_rights")
-        self.assertEqual([m["model"] for m in out["body"]["models"]], [m["model"] for m in orm._orm_list_models()])
+        # M-R6: the channel also lists the HR models (member rights only); the rest is the route's list.
+        self.assertEqual([m["model"] for m in out["body"]["models"] if m["model"] not in ORM_HR_MODELS],
+                         [m["model"] for m in orm._orm_list_models()])
         out = self.run_op("orm.fields", args={"model": "res.partner"})
         self.assertEqual(set(out["body"]), {"ok", "access_mode", "model", "fields"})
         self.assertEqual(out["body"]["model"], "res.partner")

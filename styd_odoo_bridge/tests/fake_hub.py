@@ -62,6 +62,11 @@ class FakeHub:
         self.max_held = {}        # pairing_id -> max polls held at once
         self.forced = []          # [path, status, body, times]
         self.nonces = set()
+        # Discuss assistant (docs/DISCUSS_CONTRACT.md)
+        self.discuss_ack = {"t": "ack", "accepted": True}
+        self.discuss_questions = {}   # question_id -> first discuss.ask body
+        self.discuss_asks = []        # (pairing_id, body), first time each question was seen
+        self.discuss_delivered = []   # discuss.delivered event bodies
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
         self.server.daemon_threads = True
         self.server.hub = self
@@ -142,6 +147,11 @@ class FakeHub:
             self.sessions.setdefault(pairing_id, {"queue": [], "hello": None, "held": 0})["queue"].append(msg)
             self.cond.notify_all()
             return fields["id"]
+
+    def send_answer(self, pairing_id, member_uid, args, **kw):
+        """STYD answers a Discuss question: a signed discuss_answer down the poll."""
+        return self.send(pairing_id, t="discuss_answer", op="discuss.answer", member_uid=member_uid,
+                         args=args, **kw)
 
     def queue_raw(self, pairing_id, msg):
         with self.cond:
@@ -295,6 +305,22 @@ class FakeHub:
                 rec["secret"], rec["pending"], rec["rotation_id"] = rec["pending"], None, None
                 return self._reply(200, {"t": "ack"})
             if kind in ("pong", "rotate_request"):
+                return self._reply(200, {"t": "ack"})
+            if kind == "discuss.ask":
+                # docs/DISCUSS_CONTRACT.md section 3: idempotent by question_id.
+                qid = body.get("question_id")
+                if not isinstance(qid, str) or not proto.QUESTION_ID_RE.match(qid) \
+                        or not isinstance(body.get("text"), str):
+                    return self._error(400, "bad_message")
+                first = qid not in self.discuss_questions
+                self.discuss_questions.setdefault(qid, dict(body, pairing_id=pairing_id))
+                if first:
+                    self.discuss_asks.append((pairing_id, body))
+                self.cond.notify_all()
+                return self._reply(200, dict(self.discuss_ack, question_id=qid))
+            if kind == "discuss.delivered":
+                self.discuss_delivered.append(body)
+                self.cond.notify_all()
                 return self._reply(200, {"t": "ack"})
             return self._reply(200, {"t": "ack", "ignored": True})
 

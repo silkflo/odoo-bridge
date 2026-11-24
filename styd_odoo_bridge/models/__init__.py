@@ -7,3 +7,4 @@ from . import bridge_orm
 from . import bridge_channel_pairing
 from . import bridge_channel
 from . import bridge_channel_pair
+from . import bridge_discuss

@@ -1,0 +1,321 @@
+"""M-R6: HR in the allowlist, exactly STYD's API-key HR read (odooHrAccess.ts):
+the same models, the same field lists, the same fields left out. Read over the
+outbound channel only, as the asking member's own Odoo user (no sudo, read-only
+cursor); the sudo HTTP routes refuse it."""
+
+import uuid
+
+from odoo import Command
+from odoo.tests import tagged
+
+from odoo.addons.styd_odoo_bridge.models import bridge_channel_executor as ex
+from odoo.addons.styd_odoo_bridge.models.bridge_orm import (
+    ORM_HR_FIELDS, ORM_HR_MODELS, ORM_MEMBER_RIGHTS_CTX, StydOrmError,
+)
+
+from .channel_common import ChannelCase
+
+# STYD's lists, copied by hand from odooHrAccess.ts (origin/main): a change on
+# either side must be deliberate.
+STYD_HR_FIELDS = {
+    "hr.employee.public": {"id", "name", "active", "department_id", "job_id", "job_title", "parent_id",
+                           "company_id", "work_email", "work_phone", "user_id", "tz"},
+    "hr.department": {"id", "name", "complete_name", "parent_id", "manager_id", "company_id", "active"},
+    "hr.leave.report.calendar": {"id", "employee_id", "department_id", "company_id", "state", "duration",
+                                 "start_datetime", "stop_datetime", "request_date_from", "request_date_to"},
+    "hr.leave": {"id", "employee_id", "department_id", "employee_company_id", "user_id", "request_date_from",
+                 "request_date_to", "date_from", "date_to", "number_of_days", "number_of_hours",
+                 "number_of_hours_display", "state", "holiday_status_id", "work_entry_type_id"},
+    "hr.leave.type": {"id", "name", "time_type", "requires_allocation", "unpaid", "company_id", "active"},
+    "hr.work.entry.type": {"id", "name", "count_as", "requires_allocation", "unpaid", "time_off_selectable",
+                           "active"},
+    "hr.leave.allocation": {"id", "employee_id", "employee_company_id", "number_of_days", "max_leaves",
+                            "leaves_taken", "date_from", "date_to", "state", "holiday_status_id",
+                            "work_entry_type_id", "type_request_unit"},
+    "hr.attendance": {"id", "employee_id", "check_in", "check_out", "worked_hours"},
+}
+NEVER = ("hr.employee", "hr.contract", "hr.job", "hr.payslip", "hr.expense", "hr.applicant", "hr.version",
+         "resource.calendar", "res.partner.bank")
+
+
+@tagged("post_install", "-at_install")
+class TestHrLists(ChannelCase):
+    def test_00_same_lists_as_styd(self):
+        self.assertEqual(set(ORM_HR_FIELDS), set(STYD_HR_FIELDS))
+        for model, fields in STYD_HR_FIELDS.items():
+            self.assertEqual(set(ORM_HR_FIELDS[model]), fields, model)
+        orm = self.env["styd.odoo.bridge.orm"]
+        for model in NEVER:
+            self.assertNotIn(model, orm.MODEL_ALLOWLIST)
+            self.assertNotIn(model, ORM_HR_MODELS)
+            with self.assertRaises(StydOrmError) as ctx:
+                orm.with_context(**{ORM_MEMBER_RIGHTS_CTX: True})._orm_check_model(model)
+            self.assertEqual(ctx.exception.code, "model_not_allowed", model)
+
+
+@tagged("post_install", "-at_install")
+class TestHrRead(ChannelCase):
+    def setUp(self):
+        super().setUp()
+        for needed in ("hr.leave", "hr.attendance", "hr.employee.public"):
+            if needed not in self.env:
+                self.skipTest("hr_holidays and hr_attendance are not installed")
+        Users = self.env["res.users"].with_context(no_reset_password=True)
+        group_user = self.env.ref("base.group_user")
+        self.plain = Users.create({
+            "name": "STYD HR plain", "login": "styd_hr_plain",
+            "groups_id": [Command.set([group_user.id])],
+        })
+        officer_groups = [group_user, self.env.ref("hr.group_hr_user"),
+                          self.env.ref("hr_holidays.group_hr_holidays_user")]
+        attendance_officer = self.env.ref("hr_attendance.group_hr_attendance_officer", raise_if_not_found=False)
+        if attendance_officer:
+            officer_groups.append(attendance_officer)
+        self.officer = Users.create({
+            "name": "STYD HR officer", "login": "styd_hr_officer",
+            "groups_id": [Command.set([g.id for g in officer_groups])],
+        })
+        Employee = self.env["hr.employee"]
+        self.emp_plain = Employee.create({"name": "STYD Plain Employee", "user_id": self.plain.id,
+                                          "mobile_phone": "+32 470 00 00 01"})
+        self.emp_officer = Employee.create({"name": "STYD Officer Employee", "user_id": self.officer.id})
+        self.emp_other = Employee.create({"name": "STYD Other Employee", "mobile_phone": "+32 470 99 99 99",
+                                          "private_email": "other.private@example.com"})
+        self.leave_type = self.env["hr.leave.type"].create({
+            "name": "STYD paid leave", "requires_allocation": "no", "time_type": "leave", "company_id": False,
+        })
+        Leave = self.env["hr.leave"].with_context(mail_create_nolog=True, mail_notrack=True)
+        self.leave_plain = Leave.create({
+            "name": "plain leave", "employee_id": self.emp_plain.id, "holiday_status_id": self.leave_type.id,
+            "request_date_from": "2026-03-02", "request_date_to": "2026-03-03",
+        })
+        self.leave_other = Leave.create({
+            "name": "other leave (private reason)", "employee_id": self.emp_other.id,
+            "holiday_status_id": self.leave_type.id,
+            "request_date_from": "2026-03-09", "request_date_to": "2026-03-10",
+        })
+        Attendance = self.env["hr.attendance"]
+        self.att_plain = Attendance.create({"employee_id": self.emp_plain.id, "check_in": "2026-03-04 08:00:00",
+                                            "check_out": "2026-03-04 16:00:00"})
+        self.att_other = Attendance.create({"employee_id": self.emp_other.id, "check_in": "2026-03-04 09:00:00",
+                                            "check_out": "2026-03-04 17:00:00"})
+        self.pairing = {"pairing_id": "bp_" + "H" * 22, "owner_uid": self.admin.id}
+
+    # -- helpers ------------------------------------------------------------------------
+    def run_op(self, op, args, member):
+        self.sync()
+        fields = {"v": 1, "id": str(uuid.uuid4()), "ts": 0, "op": op, "member_uid": member.id,
+                  "pairing_id": self.pairing["pairing_id"], "args_json": "{}"}
+        out = ex.execute_request(self.dbname, self.pairing, fields, args, registry=self.registry)
+        self.reload()
+        self.assertTrue(out["ok"], out)
+        return out
+
+    def member_orm(self, user):
+        ctx = ex.member_context(user, self.admin.id)
+        return self.env["styd.odoo.bridge.orm"].with_user(user).with_context(**ctx)
+
+    def assertRefused(self, codes, fn, *args, **kwargs):
+        with self.assertRaises(StydOrmError) as ctx:
+            fn(*args, **kwargs)
+        self.assertIn(ctx.exception.code, codes, (args, kwargs))
+        return ctx.exception
+
+    def odoo_ids(self, user, model, domain):
+        """What Odoo itself lets this user read (access rights and record rules)."""
+        Model = self.env[model].with_user(user).with_context(allowed_company_ids=user.company_ids.ids)
+        if not Model.check_access_rights("read", raise_exception=False):
+            return None
+        return set(Model.search(domain).ids)
+
+    # -- the sudo routes ------------------------------------------------------------------
+    def test_01_sudo_routes_refuse_hr(self):
+        orm = self.env["styd.odoo.bridge.orm"].sudo()
+        for model in ORM_HR_MODELS:
+            self.assertRefused({"model_not_allowed"}, orm._orm_search_read, model, fields=["id"])
+            self.assertRefused({"model_not_allowed"}, orm._orm_read_group, model, group_by=["id"])
+            self.assertRefused({"model_not_allowed"}, orm._orm_model_fields, model)
+        self.assertFalse([m for m in orm._orm_list_models() if m["model"].startswith("hr.")])
+        # hr.employee itself: never, not even as the member
+        out = self.run_op("orm.search_read", {"model": "hr.employee", "fields": ["name"]}, self.officer)
+        self.assertEqual((out["status"], out["body"]["error"]), (400, "model_not_allowed"))
+
+    # -- an HR officer sees what Odoo lets them see -------------------------------------------
+    def test_10_officer_sees_what_odoo_lets_them_see(self):
+        ours = [self.emp_plain.id, self.emp_other.id, self.emp_officer.id]
+        for model, fields in (
+            ("hr.leave", ["employee_id", "state", "number_of_days", "holiday_status_id"]),
+            ("hr.attendance", ["employee_id", "check_in", "check_out", "worked_hours"]),
+        ):
+            domain = [["employee_id", "in", ours]]
+            out = self.run_op("orm.search_read", {"model": model, "fields": fields, "domain": domain}, self.officer)
+            expected = self.odoo_ids(self.officer, model, domain)
+            if expected is None:
+                self.assertEqual(out["status"], 403, model)
+                continue
+            self.assertEqual(out["status"], 200, out["body"])
+            self.assertEqual(out["body"]["access_mode"], "member_rights")
+            self.assertEqual({r["id"] for r in out["body"]["records"]}, expected, model)
+        leaves = self.run_op("orm.search_read", {"model": "hr.leave", "fields": ["employee_id"],
+                                                 "domain": [["employee_id", "in", ours]]}, self.officer)
+        self.assertIn(self.leave_other.id, {r["id"] for r in leaves["body"]["records"]},
+                      "a Time Off officer reads everyone's time off, as in Odoo")
+        group = self.run_op("orm.read_group", {"model": "hr.leave", "group_by": ["employee_id"],
+                                               "aggregates": ["number_of_days:sum"],
+                                               "domain": [["employee_id", "in", ours]]}, self.officer)
+        self.assertEqual(group["status"], 200, group["body"])
+        self.assertEqual({g["employee_id"][0] for g in group["body"]["groups"]},
+                         {self.emp_plain.id, self.emp_other.id})
+
+    # -- a plain employee does not see others' private data -----------------------------------
+    def test_11_plain_employee_sees_only_their_own(self):
+        ours = [self.emp_plain.id, self.emp_other.id, self.emp_officer.id]
+        for model, fields, own in (
+            ("hr.leave", ["employee_id", "state", "number_of_days"], self.leave_plain.id),
+            ("hr.attendance", ["employee_id", "check_in", "worked_hours"], self.att_plain.id),
+        ):
+            domain = [["employee_id", "in", ours]]
+            out = self.run_op("orm.search_read", {"model": model, "fields": fields, "domain": domain}, self.plain)
+            expected = self.odoo_ids(self.plain, model, domain)
+            if expected is None:
+                self.assertEqual(out["status"], 403, model)
+                continue
+            got = {r["id"] for r in out["body"]["records"]}
+            self.assertEqual(got, expected, model)
+            self.assertEqual(got, {own}, "%s: only the employee's own rows" % model)
+        out = self.run_op("orm.read_group", {"model": "hr.leave", "group_by": ["employee_id"],
+                                             "aggregates": ["number_of_days:sum"],
+                                             "domain": [["employee_id", "in", ours]]}, self.plain)
+        self.assertEqual({g["employee_id"][0] for g in out["body"]["groups"]}, {self.emp_plain.id},
+                         "a total never folds in someone else's time off")
+        # The directory is public in Odoo (names, jobs); private columns never come out.
+        out = self.run_op("orm.search_read", {"model": "hr.employee.public", "fields": ["name", "work_email"],
+                                              "domain": [["id", "in", ours]]}, self.plain)
+        self.assertEqual(out["status"], 200)
+        self.assertEqual({r["id"] for r in out["body"]["records"]}, set(ours))
+        self.assertTrue(all(set(r) == {"id", "name", "work_email"} for r in out["body"]["records"]))
+        for field in ("mobile_phone", "private_email", "birthday", "km_home_work"):
+            out = self.run_op("orm.search_read", {"model": "hr.employee.public", "fields": ["name", field]},
+                              self.plain)
+            self.assertEqual((out["status"], out["body"]["error"]), (400, "field_not_allowed"), field)
+            out = self.run_op("orm.search_read", {"model": "hr.employee.public", "fields": ["name"],
+                                                  "domain": [[field, "!=", False]]}, self.plain)
+            self.assertEqual((out["status"], out["body"]["error"]), (400, "field_not_allowed"), field)
+        # The officer is walled the same way: the wall takes no role.
+        out = self.run_op("orm.search_read", {"model": "hr.employee.public", "fields": ["mobile_phone"]},
+                          self.officer)
+        self.assertEqual((out["status"], out["body"]["error"]), (400, "field_not_allowed"))
+        self.assertNotIn("+32 470", str(out))
+
+    # -- every left-out field is refused --------------------------------------------------------
+    def test_20_every_left_out_field_is_refused(self):
+        orm = self.member_orm(self.officer)
+        checked = 0
+        for model in sorted(ORM_HR_MODELS):
+            if model not in self.env:
+                continue
+            allowed = set(ORM_HR_FIELDS[model])
+            meta = self.env[model].fields_get()
+            left_out = sorted(set(meta) - allowed)
+            self.assertTrue(left_out, model)
+            for fname in left_out:
+                self.assertRefused({"field_not_allowed"}, orm._orm_search_read, model, fields=["id", fname])
+                self.assertRefused({"field_not_allowed", "operator_not_allowed", "domain_invalid"},
+                                   orm._orm_search_read, model, fields=["id"], domain=[[fname, "!=", False]])
+                self.assertRefused({"field_not_allowed", "order_invalid"},
+                                   orm._orm_search_read, model, fields=["id"], order=fname)
+                self.assertRefused({"field_not_allowed"}, orm._orm_read_group, model, group_by=[fname])
+                self.assertRefused({"field_not_allowed"}, orm._orm_read_group, model,
+                                   group_by=["id"], aggregates=["%s:sum" % fname])
+                checked += 1
+            # A read that names no field would return every field: refused.
+            self.assertRefused({"field_not_allowed"}, orm._orm_search_read, model)
+            self.assertRefused({"field_not_allowed"}, orm._orm_read_group, model)
+            # orm.fields describes the wall's fields only.
+            described = {f["name"] for f in orm._orm_model_fields(model)}
+            self.assertTrue(described <= allowed, (model, described - allowed))
+        self.assertGreater(checked, 100)
+
+    def test_21_listed_fields_are_readable(self):
+        """The wall's own lists work end to end (the fields this Odoo has)."""
+        orm = self.member_orm(self.officer)
+        for model in sorted(ORM_HR_MODELS):
+            if model not in self.env:
+                continue
+            meta = self.env[model].fields_get()
+            fields = [f for f in ORM_HR_FIELDS[model] if f in meta and f != "id"]
+            try:
+                out = orm._orm_search_read(model, fields=fields, limit=5)
+            except Exception as exc:  # an AccessError is Odoo's own answer, not the wall's
+                self.assertNotIsInstance(exc, StydOrmError, (model, getattr(exc, "code", exc)))
+                continue
+            self.assertIsInstance(out["records"], list, model)
+
+    def test_22_hr_company_scope(self):
+        """STYD's company scope applies on top of Odoo's rules (employee_company_id for time off)."""
+        company2 = self.env["res.company"].create({"name": "STYD HR second"})
+        self.officer.write({"company_ids": [Command.link(company2.id)]})
+        emp2 = self.env["hr.employee"].create({"name": "STYD second-company employee", "company_id": company2.id})
+        leave2 = self.env["hr.leave"].with_context(mail_create_nolog=True).create({
+            "name": "c2 leave", "employee_id": emp2.id, "holiday_status_id": self.leave_type.id,
+            "request_date_from": "2026-03-16", "request_date_to": "2026-03-16",
+        })
+        args = {"model": "hr.leave", "fields": ["employee_id"],
+                "domain": [["employee_id", "in", [emp2.id, self.emp_other.id]]]}
+        first = self.officer.company_id.id
+        ids = {r["id"] for r in self.run_op("orm.search_read", dict(args, company_ids=[first]),
+                                            self.officer)["body"]["records"]}
+        self.assertEqual(ids, {self.leave_other.id})
+        ids = {r["id"] for r in self.run_op("orm.search_read", dict(args, company_ids=[company2.id]),
+                                            self.officer)["body"]["records"]}
+        self.assertEqual(ids, {leave2.id})
+        att2 = self.env["hr.attendance"].create({"employee_id": emp2.id, "check_in": "2026-03-05 08:00:00",
+                                                 "check_out": "2026-03-05 12:00:00"})
+        self.officer.groups_id = [Command.link(self.env.ref("hr_attendance.group_hr_attendance_manager").id)]
+        att = self.run_op("orm.search_read", {"model": "hr.attendance", "fields": ["employee_id"],
+                                              "company_ids": [company2.id],
+                                              "domain": [["employee_id", "in", [emp2.id, self.emp_other.id]]]},
+                          self.officer)
+        self.assertEqual({r["id"] for r in att["body"]["records"]}, {att2.id},
+                         "attendance is scoped through the employee's company")
+
+
+@tagged("post_install", "-at_install")
+class TestPayOnAnalyticLines(ChannelCase):
+    def test_amount_only_on_journal_items(self):
+        if "account.analytic.line" not in self.env:
+            self.skipTest("account is not installed")
+        orm = self.env["styd.odoo.bridge.orm"].sudo()
+        model = "account.analytic.line"
+        journal_items = [["move_line_id", "!=", False]]
+
+        def refused(**kw):
+            with self.assertRaises(StydOrmError) as ctx:
+                (orm._orm_read_group if "group_by" in kw or "aggregates" in kw else orm._orm_search_read)(model, **kw)
+            self.assertEqual(ctx.exception.code, "field_not_allowed", kw)
+
+        # A timesheet line's amount is pay: never without the journal-item filter.
+        refused(fields=["amount"])
+        refused(fields=["name"], domain=[["amount", "<", 0]])
+        refused(fields=["name"], order="amount desc")
+        refused(group_by=["account_id"], aggregates=["amount:sum"])
+        refused(fields=["amount"], domain=["|", ["move_line_id", "!=", False], ["id", ">", 0]])
+        refused(fields=["amount"], domain=["!", ["move_line_id", "=", False]])
+        refused(fields=["amount"], domain=[["move_line_id", "=", False]])
+        # The ledger reader's reads stay open.
+        self.assertIn("records", orm._orm_search_read(model, fields=["amount", "date"], domain=journal_items))
+        self.assertIn("groups", orm._orm_read_group(model, group_by=["account_id"], aggregates=["amount:sum"],
+                                                    domain=journal_items + [["date", ">=", "2026-01-01"]]))
+        # A read naming no field gets everything but the pay (named, it is refused above).
+        self.env["account.analytic.line"].create({
+            "name": "STYD timesheet-like line", "amount": -123.45, "unit_amount": 2,
+            "account_id": self.env["account.analytic.account"].create({
+                "name": "STYD cost centre",
+                "plan_id": self.env["account.analytic.plan"].create({"name": "STYD plan"}).id}).id,
+        })
+        out = orm._orm_search_read(model, domain=[["name", "=", "STYD timesheet-like line"]])
+        self.assertEqual(out["returned_count"], 1)
+        self.assertNotIn("amount", out["records"][0])
+        self.assertEqual(out["records"][0]["unit_amount"], 2)
+        # Hours, not pay: open as before.
+        self.assertIn("records", orm._orm_search_read(model, fields=["unit_amount", "name", "date"]))

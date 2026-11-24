@@ -26,7 +26,7 @@ from odoo.exceptions import AccessError
 from odoo.modules.registry import Registry
 
 from . import bridge_channel_protocol as proto
-from .bridge_orm import ORM_MEMBER_ACCESS_MODE, ORM_MEMBER_RIGHTS_CTX, StydOrmError, _json_default
+from .bridge_orm import ORM_HR_MODELS, ORM_MEMBER_ACCESS_MODE, ORM_MEMBER_RIGHTS_CTX, StydOrmError, _json_default
 
 _logger = logging.getLogger(__name__)
 
@@ -266,6 +266,30 @@ def _run_member_op(env, op, args):
         return _err(500, "orm_error", message) + (None, detail)
 
 
+DISCUSS_HR_SHARED_DETAIL = "HR is answered only in a direct message with the assistant."
+DISCUSS_ACTIVE_STATES = ("pending", "sent")
+
+
+def discuss_read_guard(su_env, pairing_id, user, args):
+    """Reads STYD makes for a Discuss question carry ``discuss_question_id``
+    (docs/DISCUSS_CONTRACT.md). They must be for an open question of this
+    member on this pairing; in a conversation others can read, HR is refused.
+    Returns a route-like refusal tuple, None to go on, or raises ChannelError."""
+    qid = args.get("discuss_question_id")
+    if qid is None:
+        return None
+    question = None
+    if isinstance(qid, str) and proto.QUESTION_ID_RE.match(qid):
+        question = su_env["styd.discuss.question"].sudo().search([("question_id", "=", qid)], limit=1)
+    if not question or question.pairing_ref != pairing_id or question.user_id.id != user.id \
+            or question.state not in DISCUSS_ACTIVE_STATES:
+        raise proto.ChannelError("discuss_question_unknown",
+                                 "This read is not for an open Discuss question of this member.")
+    if question.shared and args.get("model") in ORM_HR_MODELS:
+        return _err(400, "model_not_allowed", DISCUSS_HR_SHARED_DETAIL) + (None, "model=%s" % str(args.get("model"))[:64])
+    return None
+
+
 # ---------------------------------------------------------------------------
 # one request, end to end
 # ---------------------------------------------------------------------------
@@ -293,8 +317,12 @@ def execute_request(dbname, pairing, fields, args, timeout_ms=None, registry=Non
             if op == "health" or op in proto.OWNER_ONLY_OPS:
                 status, body, rows, detail = _run_owner_op(su_env, op, args, pairing.get("owner_uid"))
             else:
-                env = api.Environment(cr, user.id, member_context(user, pairing.get("owner_uid")))
-                status, body, rows, detail = _run_member_op(env, op, args)
+                guarded = discuss_read_guard(su_env, pairing.get("pairing_id"), user, args)
+                if guarded:
+                    status, body, rows, detail = guarded
+                else:
+                    env = api.Environment(cr, user.id, member_context(user, pairing.get("owner_uid")))
+                    status, body, rows, detail = _run_member_op(env, op, args)
         out.update(ok=True, status=status, body=body)
         audit.update(
             outcome="granted" if status == 200 else ("error" if status >= 500 else "denied"),
