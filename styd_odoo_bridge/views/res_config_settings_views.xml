@@ -53,6 +53,113 @@
                                 />
                             </div>
                         </div>
+
+                        <div class="col-12 col-lg-6 o_setting_box" id="styd_bridge_channel_restrict_group_setting">
+                            <div class="o_setting_left_pane">
+                                <field name="styd_bridge_channel_restrict_group"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="styd_bridge_channel_restrict_group"/>
+                                <div class="text-muted">
+                                    Outbound channel: off (default), Speak To Your Database may answer as any active
+                                    internal user, administrators included. On: only as users in the group
+                                    Speak To Your Database: member.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6 o_setting_box" id="styd_bridge_channel_ca_bundle_setting">
+                            <div class="o_setting_left_pane"/>
+                            <div class="o_setting_right_pane">
+                                <label for="styd_bridge_channel_ca_bundle"/>
+                                <div class="text-muted">
+                                    Path of a PEM file of trusted authorities, for a proxy that inspects TLS.
+                                    The certificate is always checked.
+                                </div>
+                                <field name="styd_bridge_channel_ca_bundle" placeholder="/etc/ssl/certs/corporate-ca.pem"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2>Discuss assistant</h2>
+                    <div class="row mt16 o_settings_container" name="styd_discuss_block">
+                        <div class="col-12 col-lg-6 o_setting_box" id="styd_discuss_enabled_setting">
+                            <div class="o_setting_left_pane">
+                                <field name="styd_discuss_enabled"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="styd_discuss_enabled"/>
+                                <div class="text-muted">
+                                    Users ask Speak To Your Database in Discuss: a direct message to the bot, or a
+                                    mention in a channel. Answers use the asking user's own Odoo access rights and
+                                    need the outbound channel to be paired. Off by default.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6 o_setting_box" id="styd_discuss_audience_setting"
+                             attrs="{'invisible': [('styd_discuss_enabled', '=', False)]}">
+                            <div class="o_setting_left_pane"/>
+                            <div class="o_setting_right_pane">
+                                <label for="styd_discuss_audience"/>
+                                <div class="text-muted">
+                                    Anyone else gets a short reply asking them to see their administrator; nothing
+                                    is sent to Speak To Your Database.
+                                </div>
+                                <field name="styd_discuss_audience" widget="radio"/>
+                                <field name="styd_discuss_group_id" options="{'no_create': True}"
+                                       attrs="{'invisible': [('styd_discuss_audience', '!=', 'group')], 'required': [('styd_discuss_enabled', '=', True), ('styd_discuss_audience', '=', 'group')]}"/>
+                                <field name="styd_discuss_user_ids" widget="many2many_tags" options="{'no_create': True}"
+                                       attrs="{'invisible': [('styd_discuss_audience', '!=', 'users')]}"/>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6 o_setting_box" id="styd_discuss_answer_in_channel_setting"
+                             attrs="{'invisible': [('styd_discuss_enabled', '=', False)]}">
+                            <div class="o_setting_left_pane">
+                                <field name="styd_discuss_answer_in_channel"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="styd_discuss_answer_in_channel"/>
+                                <div class="text-muted">
+                                    Off (default): a mention in a channel or group is answered in a direct message to
+                                    the asker, with one line in the channel saying so. On: the answer is posted in the
+                                    channel, readable by everyone in it; HR questions are then refused.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6 o_setting_box" id="styd_discuss_pairing_setting"
+                             attrs="{'invisible': [('styd_discuss_enabled', '=', False)]}">
+                            <div class="o_setting_left_pane"/>
+                            <div class="o_setting_right_pane">
+                                <label for="styd_discuss_pairing"/>
+                                <div class="text-muted">
+                                    Only when this Odoo is paired with several Speak To Your Database workspaces.
+                                </div>
+                                <field name="styd_discuss_pairing"/>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6 o_setting_box" id="styd_discuss_rate_setting"
+                             attrs="{'invisible': [('styd_discuss_enabled', '=', False)]}">
+                            <div class="o_setting_left_pane"/>
+                            <div class="o_setting_right_pane">
+                                <span class="o_form_label">Rate limits</span>
+                                <div class="text-muted">
+                                    Questions beyond these limits get a short reply; nothing is sent to
+                                    Speak To Your Database.
+                                </div>
+                                <div>
+                                    <label for="styd_discuss_rate_user_hour"/>
+                                    <field name="styd_discuss_rate_user_hour" class="oe_inline"/>
+                                </div>
+                                <div>
+                                    <label for="styd_discuss_rate_db_hour"/>
+                                    <field name="styd_discuss_rate_db_hour" class="oe_inline"/>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </xpath>
