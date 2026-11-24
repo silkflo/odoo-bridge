@@ -49,16 +49,50 @@ def dumps(payload):
 
 
 # ---------------------------------------------------------------------------
-# limits (section 10): 4 threads, a queue of 16, 10 calls/s with bursts of 20
+# limits (section 10): 4 threads, a queue of 16, a token bucket of 40 calls/s
+# with bursts of 60 (S4 open point 8: one engine question is 22 to 25 reads, so
+# the former 10/s burst 20 answered `busy` on every question after the first).
+# The bucket is two system parameters, read by the leader every tick.
 # ---------------------------------------------------------------------------
+ICP_RATE = "styd_odoo_bridge.channel_rate_per_s"
+ICP_BURST = "styd_odoo_bridge.channel_burst"
+DEFAULT_WORKERS = 4
+DEFAULT_QUEUE = 16
+DEFAULT_RATE = 40.0
+DEFAULT_BURST = 60
+LIMIT_MIN = 1
+LIMIT_MAX = 1000
+
+
+def parse_limit(raw, default):
+    """A system parameter as a bucket limit: a number from 1 to 1000, else the default."""
+    try:
+        value = float(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+    if value != value or value < LIMIT_MIN:  # NaN, zero, negative
+        return default
+    return min(value, LIMIT_MAX)
+
+
 class TokenBucket:
-    def __init__(self, rate=10.0, burst=20, clock=time.monotonic):
+    def __init__(self, rate=DEFAULT_RATE, burst=DEFAULT_BURST, clock=time.monotonic):
         self.rate = float(rate)
         self.burst = float(burst)
         self.tokens = float(burst)
         self.clock = clock
         self.last = clock()
         self._lock = threading.Lock()
+
+    def configure(self, rate, burst):
+        """New limits for a running bucket; the tokens left stay (capped at the new burst)."""
+        with self._lock:
+            now = self.clock()
+            self.tokens = min(self.burst, self.tokens + (now - self.last) * self.rate)
+            self.last = now
+            self.rate = float(rate)
+            self.burst = float(burst)
+            self.tokens = min(self.tokens, self.burst)
 
     def take(self):
         with self._lock:
@@ -75,7 +109,8 @@ class ChannelExecutor:
     """A bounded pool. ``try_submit`` returns False (the caller answers ``busy``)
     when the queue is full or the token bucket is empty."""
 
-    def __init__(self, dbname, workers=4, queue_size=16, rate=10.0, burst=20):
+    def __init__(self, dbname, workers=DEFAULT_WORKERS, queue_size=DEFAULT_QUEUE, rate=DEFAULT_RATE,
+                 burst=DEFAULT_BURST):
         self.dbname = dbname
         self.capacity = workers + queue_size
         self.bucket = TokenBucket(rate, burst)
@@ -86,6 +121,10 @@ class ChannelExecutor:
     @property
     def inflight(self):
         return self._inflight
+
+    def set_limits(self, rate, burst):
+        if (self.bucket.rate, self.bucket.burst) != (float(rate), float(burst)):
+            self.bucket.configure(rate, burst)
 
     def try_submit(self, fn, *args):
         with self._lock:

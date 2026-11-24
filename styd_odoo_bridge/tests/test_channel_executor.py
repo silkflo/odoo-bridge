@@ -247,7 +247,7 @@ class TestChannelExecutor(ChannelCase):
         pool = ex.ChannelExecutor(self.dbname)
         self.addCleanup(pool.shutdown, True)
         self.assertEqual(pool.capacity, 4 + 16)
-        self.assertEqual((pool.bucket.rate, pool.bucket.burst), (10.0, 20.0))
+        self.assertEqual((pool.bucket.rate, pool.bucket.burst), (40.0, 60.0))  # S4 open point 8
 
     # -- audit ---------------------------------------------------------------------------------
     def test_40_audit_rows(self):

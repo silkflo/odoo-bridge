@@ -57,7 +57,7 @@ LOCK_KEY = 0x535459444232
 POLLERS = 2
 POLL_TIMEOUT = (10, 40)    # hold 25 s + 15
 POST_TIMEOUT = (10, 30)
-REFRESH_S = 10             # leader: re-read pairings, settings, lock health
+REFRESH_S = 10             # leader: re-read pairings, settings (fresh), lock health
 SEEN_GC_S = 60
 STATUS_WRITE_S = 60        # last_seen_at written at most once a minute
 NOT_PAIRED_RETRY_S = 600
@@ -102,12 +102,41 @@ def resolve_verify(ca_bundle):
     return ca_bundle
 
 
-def read_settings(env):
+# The parameters the running leader must see within its tick (S4 open point 6).
+# ``get_param`` is cached per process and the leader's process clears that cache
+# only when it runs a cron job, so a corrected hub URL or CA bundle took up to
+# 75 s. ``PairingStore.load`` reads these straight from the table instead.
+FRESH_PARAMS = (
+    executor_mod.ICP_ENABLED,
+    ICP_HUB_URL,
+    ICP_CA_BUNDLE,
+    executor_mod.ICP_RATE,
+    executor_mod.ICP_BURST,
+)
+
+
+def read_params_fresh(cr, keys=FRESH_PARAMS):
+    """``{key: value}`` from ``ir_config_parameter`` itself, never the ORM cache."""
+    cr.execute("SELECT key, value FROM ir_config_parameter WHERE key IN %s", (tuple(keys),))
+    return dict(cr.fetchall())
+
+
+def read_settings(env, fresh=False):
+    """The channel settings. ``fresh``: the channel parameters come from the table
+    (the leader's tick), not from the per-process ``get_param`` cache."""
     icp = env["ir.config_parameter"].sudo()
+    if fresh:
+        raw = read_params_fresh(env.cr)
+        get = raw.get
+    else:
+        def get(key):
+            return icp.get_param(key)
     return {
-        "enabled": executor_mod._truthy(icp.get_param(executor_mod.ICP_ENABLED, "False")),
-        "hub_url": icp.get_param(ICP_HUB_URL, "") or DEFAULT_HUB_URL,
-        "ca_bundle": icp.get_param(ICP_CA_BUNDLE, "") or "",
+        "enabled": executor_mod._truthy(get(executor_mod.ICP_ENABLED) or "False"),
+        "hub_url": get(ICP_HUB_URL) or DEFAULT_HUB_URL,
+        "ca_bundle": get(ICP_CA_BUNDLE) or "",
+        "rate": executor_mod.parse_limit(get(executor_mod.ICP_RATE), executor_mod.DEFAULT_RATE),
+        "burst": executor_mod.parse_limit(get(executor_mod.ICP_BURST), executor_mod.DEFAULT_BURST),
         "db_uuid": icp.get_param("database.uuid", "") or "",
     }
 
@@ -221,7 +250,7 @@ class PairingStore:
             if not row or row[0] not in ("installed", "to upgrade"):
                 return None
             env = self._env(cr)
-            settings = read_settings(env)
+            settings = read_settings(env, fresh=True)
             Pairing = env["styd.odoo.bridge.pairing"].sudo()
             pairings = [p._snapshot() for p in Pairing.search(Pairing._streamable_domain())]
             return {"settings": settings, "pairings": pairings}
@@ -698,7 +727,7 @@ class ChannelRunner(threading.Thread):
                 return
             self.state = "leader"
             _logger.info("STYD channel: pid=%s is the channel leader", os.getpid())
-            self.executor = executor_mod.ChannelExecutor(self.dbname)
+            self.executor = executor_mod.ChannelExecutor(self.dbname)  # limits set by each tick
             while not self.stop_event.is_set():
                 if not self.lock_alive():
                     _logger.warning("STYD channel: lock connection lost, stopping")
@@ -724,6 +753,8 @@ class ChannelRunner(threading.Thread):
         if not loaded["pairings"]:
             return False
         self.info["db_uuid"] = settings["db_uuid"]
+        if self.executor is not None:
+            self.executor.set_limits(settings["rate"], settings["burst"])
         hub_key = (settings["hub_url"], settings["ca_bundle"])
         if hub_key != self._hub_key:
             try:

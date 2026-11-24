@@ -10,3 +10,4 @@ from . import test_rpc_access
 from . import test_read_policy
 from . import test_hr_read
 from . import test_discuss
+from . import test_channel_settings
