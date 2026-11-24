@@ -41,6 +41,75 @@
                                 options="{'no_create': True}"
                             />
                         </setting>
+
+                        <setting
+                            string="Only members of the STYD group"
+                            help="Outbound channel: off (default), Speak To Your Database may answer as any active internal user, administrators included. On: only as users in the group Speak To Your Database: member."
+                            id="styd_bridge_channel_restrict_group_setting"
+                        >
+                            <field name="styd_bridge_channel_restrict_group"/>
+                        </setting>
+
+                        <setting
+                            string="Custom CA bundle (outbound channel)"
+                            help="Path of a PEM file of trusted authorities, for a proxy that inspects TLS. The certificate is always checked."
+                            id="styd_bridge_channel_ca_bundle_setting"
+                        >
+                            <field name="styd_bridge_channel_ca_bundle" placeholder="/etc/ssl/certs/corporate-ca.pem"/>
+                        </setting>
+                    </block>
+                    <block title="Discuss assistant" name="styd_discuss_block">
+                        <setting
+                            string="Discuss assistant"
+                            help="Users ask Speak To Your Database in Discuss: a direct message to the bot, or a mention in a channel. Answers use the asking user's own Odoo access rights and need the outbound channel to be paired. Off by default."
+                            id="styd_discuss_enabled_setting"
+                        >
+                            <field name="styd_discuss_enabled"/>
+                        </setting>
+                        <setting
+                            string="Who may ask"
+                            help="Anyone else gets a short reply asking them to see their administrator; nothing is sent to Speak To Your Database."
+                            id="styd_discuss_audience_setting"
+                            invisible="not styd_discuss_enabled"
+                        >
+                            <field name="styd_discuss_audience" widget="radio"/>
+                            <field name="styd_discuss_group_id" options="{'no_create': True}"
+                                   invisible="styd_discuss_audience != 'group'"
+                                   required="styd_discuss_enabled and styd_discuss_audience == 'group'"/>
+                            <field name="styd_discuss_user_ids" widget="many2many_tags" options="{'no_create': True}"
+                                   invisible="styd_discuss_audience != 'users'"/>
+                        </setting>
+                        <setting
+                            string="Answer mentions in the channel"
+                            help="Off (default): a mention in a channel or group is answered in a direct message to the asker, with one line in the channel saying so. On: the answer is posted in the channel, readable by everyone in it; HR questions are then refused."
+                            id="styd_discuss_answer_in_channel_setting"
+                            invisible="not styd_discuss_enabled"
+                        >
+                            <field name="styd_discuss_answer_in_channel"/>
+                        </setting>
+                        <setting
+                            string="Workspace answering in Discuss"
+                            help="Only when this Odoo is paired with several Speak To Your Database workspaces."
+                            id="styd_discuss_pairing_setting"
+                            invisible="not styd_discuss_enabled"
+                        >
+                            <field name="styd_discuss_pairing"/>
+                        </setting>
+                        <setting
+                            string="Rate limits"
+                            help="Questions beyond these limits get a short reply; nothing is sent to Speak To Your Database."
+                            id="styd_discuss_rate_setting"
+                            invisible="not styd_discuss_enabled"
+                        >
+                            <div>
+                                <label for="styd_discuss_rate_user_hour"/>
+                                <field name="styd_discuss_rate_user_hour" class="oe_inline"/>
+                            </div>
+                            <div>
+                                <label for="styd_discuss_rate_db_hour"/>
+                                <field name="styd_discuss_rate_db_hour" class="oe_inline"/>
+                            </div>
+                        </setting>
                     </block>
                 </app>
             </xpath>

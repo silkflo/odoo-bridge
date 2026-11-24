@@ -18,6 +18,10 @@
                 <field name="http_status"/>
                 <field name="source_ip"/>
                 <field name="token_fingerprint" optional="show"/>
+                <field name="member_uid" optional="hide"/>
+                <field name="duration_ms" optional="hide"/>
+                <field name="row_count" optional="hide"/>
+                <field name="pairing_ref" optional="hide"/>
                 <field name="detail" optional="hide"/>
             </list>
         </field>
@@ -42,6 +46,10 @@
                             <field name="http_status"/>
                             <field name="source_ip"/>
                             <field name="token_fingerprint"/>
+                            <field name="member_uid"/>
+                            <field name="pairing_ref"/>
+                            <field name="duration_ms"/>
+                            <field name="row_count"/>
                         </group>
                     </group>
                     <group string="Detail">
