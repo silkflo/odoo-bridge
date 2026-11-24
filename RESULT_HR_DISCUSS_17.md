@@ -11,11 +11,12 @@ copied to the session scratchpad (no `__pycache__` in the worktree).
 | Run | Apps installed | Result |
 |---|---|---|
 | Baseline, `3e99f9f` unchanged | styd_odoo_bridge, project, account, hr_holidays, hr_attendance, hr_timesheet | 129 / 130 (the known `test_21_manifest_version_bumped`) |
-| This branch | same | **164 / 165**: the 129 still pass, all 35 new pass; the one failure is the same known version pin |
-| This branch | styd_odoo_bridge only (base + mail) | 164 / 165, the HR tests skip cleanly (no HR app) |
+| This branch, after the owner decisions | same | **166 / 167**: the 129 still pass, all 37 new pass; the one failure is the same known version pin |
+| This branch, after the owner decisions | styd_odoo_bridge only (base + mail) | 166 / 167, the HR tests skip cleanly (no HR app) |
 
 `test_21_manifest_version_bumped` was already failing: it pins `17.0.0.10.0` while the manifest says
-`17.0.0.10.1`. Left as is: the version bump belongs to the 0.11.0 release step (M5), see below.
+`17.0.0.10.1`. Left as is (owner decision 2): the version is bumped, and `test_21` fixed, only at the 0.11.0
+release step.
 
 One existing test changed on purpose: `test_channel_executor.test_10_bodies_match_the_routes` now compares
 the channel's model list **minus the HR models** with the route's list (HR is listed over the channel only).
@@ -90,10 +91,20 @@ fields and view, `bridge_channel.py` (hello `features`, `discuss_answer` dispatc
   the job and reports `discuss.delivered`. The job posts it as the bot: "Understood as" line, text, HTML
   tables (built by the module, every value escaped), refusals and errors, in the answer's / user's language.
   No answer within 180 s: "did not answer in time"; a later answer is `late`.
+- **Where the bot answers** (owner decision 3). In the user's own chat with the bot: there. A mention
+  anywhere else (channel, group, chat with a colleague): in the asker's direct chat with the bot (opened if
+  needed, `shared: false`, HR answered normally), then one line where it was asked, as a reply to the
+  question: "I've answered you in a direct message." (7 languages), posted once the reply is in the chat
+  (answer, refusal, error, timeout or "could not reach"). Admin setting **"Answer mentions in the channel"**
+  (off by default): the answer is posted in the channel, `shared: true`, HR refused, as before.
 - **Admin options** (Settings > Speak To Your Database > Discuss assistant), **off by default**: switch, who may
-  ask (all internal users / a group / chosen users), the workspace when several are paired, per-user and
-  per-database hourly limits. Saving with the switch on opens each allowed user's chat with the bot, with a
-  welcome line (the OdooBot way: no change to Discuss screens; at most 500 per save).
+  ask (all internal users / a group / chosen users), answer mentions in the channel, the workspace when
+  several are paired, per-user and per-database hourly limits.
+- **Welcome line** (owner decision 4): saving with the assistant on opens the chat with the bot, with one
+  welcome line, for each allowed user **never welcomed before** (recorded in `styd.discuss.welcome`, no
+  ACL). Once per user ever: later saves never post it again, even if the user left the chat; nothing is
+  opened or posted while the assistant is off. A user whose first contact is a mention gets it in the chat
+  that opens for the answer. (No change to Discuss screens; at most 500 chats per save.)
 - **Free replies, no call to STYD**: switched off, user not allowed ("ask your admin"), not connected, empty
   mention, rate limited (3 per user per minute, 30 per user per hour, 300 per database per hour).
 - **Security**: question text sent as a JSON string, never interpreted; everything from STYD escaped; module's
@@ -102,36 +113,44 @@ fields and view, `bridge_channel.py` (hello `features`, `discuss_answer` dispatc
   `discuss_question_id` must match an open question of that member, and **HR is refused when others can read
   the conversation**.
 
-**Tests** (`tests/test_discuss.py`, 27, against the fake hub, extended to follow the contract): off by
+**Tests** (`tests/test_discuss.py`, 29, against the fake hub, extended to follow the contract): off by
 default; a DM saves and triggers without any call to STYD; the job's signed `discuss.ask` (fields, language,
-conversation key, follow-ups share it, other chats do not); mention in a channel (shared, answer posted there,
-non-mentions ignored); empty mention; answer rendering (understood-as, escaped record text, table, row count,
+conversation key, follow-ups share it, other chats do not); a mention in a channel answered in the asker's
+direct chat (welcome first, "Looking it up…", the answer, `shared: false`, `asked_in: channel`, exactly one
+line in the channel as a reply to the question, no answer content there, a follow-up in the chat keeps the
+thread with no second welcome); a mention in a group whose refusal also goes to the chat; the "Answer
+mentions in the channel" setting (answer in the channel, `shared: true`, HR refused); non-mentions ignored;
+empty mention; answer rendering (understood-as, escaped record text, table, row count,
 order after "Looking it up…"); end to end through a real poll (hello `features`, `discuss.delivered`);
 refusals and errors in French; answer checks (wrong member, other pairing, unknown, malformed, extra fields
 pointing to another channel ignored, duplicate, late); timeout; no secret ever posted; who may ask (users,
 group, portal, `__system__`, STYD-group restriction); rate limits; hub refusals (`member_unknown`,
 `discuss_off`, `prompts_exhausted`, ignored); unreachable hub retried 3 times then said; not connected;
 crafted text stays data and the bot cannot write; envelope rules (t/op/member, wrong secret refused before
-storing); reads tagged with a question (member, open, HR refused when shared); settings open chats once;
+storing); reads tagged with a question (member, open, HR refused when shared); settings open chats with one welcome,
+once per user ever (not after leaving the chat, not while the assistant is off);
 pure text helpers (mention removal, truncation, escaping, answer limits, 7 languages complete).
 
-## 3. Decisions to confirm (Florian)
+## 3. Owner decisions (2026-11-24) and what was done
 
-1. **`mail` is now a dependency** (`depends: ["base", "mail"]`, was `["base"]`). Discuss needs it; almost every
-   real Odoo has it. Alternative: a separate auto-install glue module, at the cost of a second module in the
-   listing.
-2. **Version.** The manifest stays `17.0.0.10.1`. The hub's default `min_module_version` is `0.11.0`, so the
-   0.11.0 release step must bump it (and the `test_21` pin with it).
-3. **Answers in channels.** A mention in a channel is answered in the channel, with the asker's own rights,
-   readable by everyone there. The module refuses HR in that case; anything else private is left to STYD
-   (contract §6). Option: answer channel mentions in a DM instead.
-4. **Timesheet `amount`** is now refused on the sudo routes too unless the read is journal-item lines only.
-   STYD's ledger reader always sends that filter, so nothing it does changes.
-5. **Chats opened on save** for every allowed user, with a welcome line (like OdooBot onboarding). Users
-   added later get theirs on the next save, or can mention the bot.
-6. A mention of the bot on a record's chatter is ignored, but Odoo still tries to email the bot partner
-   (no address: a failed notification on that message). Harmless; could be avoided by hiding the bot from
-   chatter mention suggestions (a Discuss screen change, so not done).
+1. **`mail` as a dependency: yes.** `depends: ["base", "mail"]`.
+2. **Version: bumped only at the 0.11.0 release step**, with the `test_21` fix then. The manifest stays
+   `17.0.0.10.1` here. (The hub's default `min_module_version` is `0.11.0`, so a real hub refuses this build
+   until that step.)
+3. **Mentions answered in a direct message by default**, with one line in the channel; admin setting
+   "Answer mentions in the channel" (off by default) keeps the channel answer (`shared: true`, HR refused).
+   Done as described in §2; the contract says `conversation.shared` is false for the DM answer and adds
+   `conversation.asked_in`. One choice made here: a mention inside a 1-to-1 chat with a colleague counts
+   like a channel (someone else reads it), so it is answered in the asker's chat with the bot too.
+4. **Welcome once per user ever, only when the assistant is on.** Done as described in §2.
+
+Still open, no decision needed now:
+
+- **Timesheet `amount`** is refused on the sudo routes too unless the read is journal-item lines only.
+  STYD's ledger reader always sends that filter, so nothing it does changes.
+- A mention of the bot on a record's chatter is ignored, but Odoo still tries to email the bot partner
+  (no address: a failed notification on that message). Harmless; avoiding it would need a Discuss screen
+  change.
 
 ## 4. Next
 

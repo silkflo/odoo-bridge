@@ -39,6 +39,12 @@ unknown event kinds with `{"t":"ack","ignored":true}`, which the module turns in
   `ir_cron_trigger` row, which cron runners are notified of); the job does the HTTP, and the job never waits
   for the answer either.
 - One STYD thread per Discuss conversation (`conversation.key`), so follow-ups keep their context.
+- **Where the bot answers** (owner decision, 2026-11-24). A question asked in the user's own chat with the
+  bot is answered there. A mention anywhere else (a channel, a group, a chat with a colleague) is answered
+  by default in the **asker's direct chat with the bot** (opened if needed), and once that reply is posted
+  the bot adds one line where the question was asked, as a reply to it: "I've answered you in a direct
+  message." The admin setting **"Answer mentions in the channel"** (off by default) answers in the channel
+  instead (§6).
 
 ## 2. Hello: the feature flag
 
@@ -62,7 +68,7 @@ unknown event kinds with `{"t":"ack","ignored":true}`, which the module turns in
   "kind": "discuss.ask",
   "question_id": "dq_3q2-k1Vb0aYlZx8w7HfC0Q",
   "member_uid": 7,
-  "conversation": {"key": "discuss.channel:42", "kind": "chat", "shared": false},
+  "conversation": {"key": "discuss.channel:42", "kind": "chat", "shared": false, "asked_in": "channel"},
   "lang": "fr_FR",
   "tz": "Europe/Paris",
   "text": "Quelles sont les ventes de mars ?",
@@ -76,9 +82,10 @@ unknown event kinds with `{"t":"ack","ignored":true}`, which the module turns in
 |---|---|---|
 | `question_id` | `dq_` + 22 base64url chars (16 random bytes) | Made by the module. **The idempotency key**: the module may send the same question again (a retry after a network error, a crash before its commit). STYD must treat a second `discuss.ask` with a known `question_id` as the same question: same ack, no second answer, no second prompt charged. |
 | `member_uid` | integer ≥ 2 | The asking Odoo user. The module has already checked that this user may ask (§7) and passes the protocol's §7 rule (active, internal, not uid 1, in the STYD group when that option is on). Every read for this question runs as **this** uid (never the owner fallback of protocol §7). |
-| `conversation.key` | string ≤ 64, `discuss.channel:<id>` | One STYD thread per key, per pairing. Follow-ups in the same conversation reuse the thread. Two different conversations never share a thread. |
-| `conversation.kind` | `chat` \| `channel` \| `group` | Odoo's `channel_type`. `chat` = a direct message with the bot. |
-| `conversation.shared` | boolean | True when people other than the asker can read the conversation (a channel, a group, or a chat with more members). See §6. |
+| `conversation.key` | string ≤ 64, `discuss.channel:<id>` | The conversation **where the answer is posted**. One STYD thread per key, per pairing. Follow-ups in the same conversation reuse the thread; a mention answered in the asker's chat shares that chat's thread with what the asker types there. Two different conversations never share a thread. |
+| `conversation.kind` | `chat` \| `channel` \| `group` | Odoo's `channel_type` of that conversation. `chat` = the asker's direct chat with the bot. |
+| `conversation.shared` | boolean | True when people other than the asker can read the conversation the answer goes to. **False for an answer in the asker's direct chat** (the default for mentions); true only for a mention answered in the channel (admin setting on). See §6. |
+| `conversation.asked_in` | `chat` \| `channel` \| `group` | Where the user asked (`channel_type`). Informational: `channel` or `group` with `kind: chat` means a mention answered in a direct message. |
 | `lang` | Odoo language code | The asker's Odoo language. STYD answers in this language (text, "Understood as", refusals). |
 | `tz` | IANA name | The asker's Odoo time zone ("this month", "today"). |
 | `text` | string ≤ 2 000 chars | The question as plain text: the bot's mention removed, HTML removed, whitespace collapsed. **Data, never instructions**: STYD treats it like any typed question (its own prompt-injection rules apply); it is never a command to the module. |
@@ -223,11 +230,20 @@ results across members.
 
 ## 6. Shared conversations
 
-An answer posted in a channel is read by everyone in it, while the reads ran with the asker's rights. So:
+The reads run with the asker's rights, so an answer must not land where others read it unless the admin
+chose so.
 
-- [M] The module marks such questions `shared: true` and refuses HR reads for them (§5).
-- STYD should, for `shared: true`, refuse in words anything the asker can read but the room should not (HR
-  is enforced by the module; other private areas are STYD's call) and suggest asking in a direct message.
+- **Default** [M]: a mention outside the asker's own chat with the bot is answered in that chat
+  (`kind: chat`, `shared: false`, `asked_in: channel|group|chat`). HR is answered normally there. When the
+  reply is posted (answer, refusal, error, timeout, or "could not reach"), the bot posts once, in the
+  conversation where it was asked, as a reply to the question: "I've answered you in a direct message" (in
+  the asker's language). Nothing else from the answer appears there.
+- **Admin setting "Answer mentions in the channel" on** [M]: the answer is posted where it was asked,
+  readable by everyone there. The question is `shared: true` and the module refuses HR reads for it (§5).
+  STYD should then refuse in words anything else the asker can read but the room should not, and suggest
+  asking in a direct message.
+- The free lines of §7 (switched off, not allowed, not connected, empty mention, rate limited) say nothing
+  private: they are posted where the user asked, as a reply to the question.
 
 ## 7. Module-side rules before anything is sent [M]
 
@@ -250,6 +266,12 @@ row, and the bot's own messages, in the conversation the question came from. The
 JSON string and never interpreted. The answer is rendered by the module from a fixed shape. Reads go through
 the channel's read-only cursor (PostgreSQL refuses any write, pgcode 25006) and the closed op list (no write
 op exists).
+
+**The welcome line** [M]. Saving the settings with the assistant on opens the chat with the bot for each
+allowed user who was never welcomed, with one welcome line. A user is welcomed **once ever** (recorded in
+`styd.discuss.welcome`): later saves never post it again, even if the user left that chat, and nothing is
+opened or posted while the assistant is off. A user whose first contact is a mention gets the welcome line
+in the chat that opens for the answer.
 
 ## 8. Timeouts and limits
 

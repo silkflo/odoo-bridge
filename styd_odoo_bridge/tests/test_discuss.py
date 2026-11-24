@@ -121,7 +121,7 @@ class TestDiscussAsk(DiscussCase):
         self.assertEqual(body["question_id"], q.question_id)
         self.assertEqual(body["member_uid"], self.asker.id)
         self.assertEqual(body["conversation"], {"key": "discuss.channel:%d" % chat.id, "kind": "chat",
-                                                "shared": False})
+                                                "shared": False, "asked_in": "chat"})
         self.assertEqual((body["lang"], body["tz"]), ("fr_FR", "Europe/Paris"))
         self.assertEqual(body["text"], "Quelles sont les ventes de mars ?")
         self.assertEqual(body["attempt"], 1)
@@ -143,23 +143,91 @@ class TestDiscussAsk(DiscussCase):
         self.assertNotEqual(keys[0], keys[2])
         self.assertEqual(self.hub.discuss_asks[2][1]["lang"], "en_US")
 
-    def test_05_mention_in_a_channel(self):
-        room = self.env["discuss.channel"].sudo().create({"name": "STYD sales room", "channel_type": "channel"})
+    def room(self, kind="channel", name="STYD sales room"):
+        room = self.env["discuss.channel"].sudo().create({"name": name, "channel_type": kind})
         room.add_members(partner_ids=[self.asker.partner_id.id, self.outsider.partner_id.id],
                          post_joined_message=False)
+        return room
+
+    def chat_of(self, user):
+        return self.env["discuss.channel"].sudo().search([
+            ("channel_type", "=", "chat"), ("channel_member_ids.partner_id", "=", user.partner_id.id),
+            ("channel_member_ids.partner_id", "=", self.bot.id)])
+
+    def test_05_mention_answered_in_a_direct_message(self):
+        """Default: a mention in a channel is answered in the asker's chat with the bot,
+        and one line in the channel says so, as a reply to the question."""
+        room = self.room()
         self.ask(self.outsider, room, "no mention here")
-        self.assertFalse(self.Question.search([("channel_id", "=", room.id)]), "only a mention is a question")
-        self.ask(self.asker, room, "Ventes de mars ?", mention=True)
-        q = self.Question.search([("channel_id", "=", room.id)])
+        self.assertFalse(self.Question.search([]), "only a mention is a question")
+        asked = self.ask(self.asker, room, "Ventes de mars ?", mention=True)
+        q = self.Question.search([])
+        chat = self.chat_of(self.asker)
+        self.assertEqual(len(chat), 1, "the asker's chat with the bot is opened")
+        self.assertEqual((q.channel_id, q.origin_channel_id), (chat, room))
         self.assertEqual(q.text, "Ventes de mars ?", "the mention itself is not part of the question")
+        self.assertFalse(q.shared, "answered in a direct message: nobody else reads it")
+        self.assertFalse(self.bot_bodies(room), "nothing in the channel before the answer")
+        self.run_job()
+        body = self.hub.discuss_asks[0][1]
+        self.assertEqual(body["conversation"], {"key": "discuss.channel:%d" % chat.id, "kind": "chat",
+                                                "shared": False, "asked_in": "channel"})
+        self.assertEqual(self.deliver(q), "ok")
+        self.run_job()
+        texts = self.bot_texts(chat)
+        self.assertIn(text_mod.say("welcome", "fr_FR")[:30], texts[0], "first contact: the welcome line")
+        self.assertIn("Je cherche…", texts[-2])
+        self.assertIn("12 400", texts[-1], "the answer is in the direct message")
+        room_msgs = self.env["mail.message"].sudo().search(
+            [("model", "=", "discuss.channel"), ("res_id", "=", room.id), ("author_id", "=", self.bot.id)])
+        self.assertEqual(len(room_msgs), 1, "one line in the channel")
+        self.assertIn(text_mod.say("answered_in_dm", "fr_FR"), self.bot_texts(room)[0])
+        self.assertEqual(room_msgs.parent_id, asked, "as a reply to the question")
+        self.assertNotIn("12 400", " ".join(self.bot_texts(room)))
+        # a follow-up in the direct chat continues the same STYD thread, with no second welcome
+        self.ask(self.asker, chat, "Et en avril ?")
+        self.run_job()
+        self.assertEqual(self.hub.discuss_asks[1][1]["conversation"]["key"], body["conversation"]["key"])
+        self.assertEqual(len(self.bot_texts(chat)) - len(texts), 1, "only 'looking it up'")
+
+    def test_07_mention_in_a_group_refusal_also_goes_to_the_dm(self):
+        group_chat = self.room(kind="group", name="")
+        self.hub.discuss_ack = {"t": "ack", "accepted": False, "code": "member_unknown"}
+        self.ask(self.asker, group_chat, "Ventes ?", mention=True)
+        self.run_job()
+        chat = self.chat_of(self.asker)
+        self.assertIn(text_mod.say("member_unknown", "fr_FR"), self.bot_texts(chat)[-1])
+        self.assertEqual(self.bot_texts(group_chat), [text_mod.say("answered_in_dm", "fr_FR")])
+
+    def test_08_answer_mentions_in_the_channel_setting(self):
+        """With the admin setting on: answered in the channel, shared, HR refused there."""
+        self.icp.set_param(discuss.ICP_ANSWER_IN_CHANNEL, "True")
+        room = self.room()
+        self.ask(self.asker, room, "Ventes de mars ?", mention=True)
+        q = self.Question.search([])
+        self.assertEqual((q.channel_id, q.origin_channel_id.id), (room, False))
         self.assertTrue(q.shared)
+        self.assertFalse(self.chat_of(self.asker), "no direct chat needed")
         self.run_job()
         body = self.hub.discuss_asks[0][1]
         self.assertEqual(body["conversation"], {"key": "discuss.channel:%d" % room.id, "kind": "channel",
-                                                "shared": True})
+                                                "shared": True, "asked_in": "channel"})
         self.assertEqual(self.deliver(q), "ok")
         self.run_job()
         self.assertIn("12 400", self.bot_bodies(room)[-1], "the answer goes to the channel it was asked in")
+        self.assertNotIn(text_mod.say("answered_in_dm", "fr_FR"), " ".join(self.bot_texts(room)))
+        if "hr.employee.public" in self.env:
+            q2 = self.Question.create({"question_id": proto.new_question_id(), "user_id": self.asker.id,
+                                       "channel_id": room.id, "state": "sent", "shared": True,
+                                       "pairing_ref": self.row.pairing_id})
+            self.sync()
+            out = ex.execute_request(
+                self.dbname, {"pairing_id": self.row.pairing_id, "owner_uid": self.admin.id},
+                {"v": 1, "id": str(uuid.uuid4()), "ts": 0, "op": "orm.search_read", "member_uid": self.asker.id,
+                 "pairing_id": self.row.pairing_id, "args_json": "{}"},
+                {"model": "hr.employee.public", "fields": ["name"], "discuss_question_id": q2.question_id},
+                registry=self.registry)
+            self.assertEqual((out["status"], out["body"]["error"]), (400, "model_not_allowed"))
 
     def test_06_empty_question_gets_help(self):
         room = self.env["discuss.channel"].sudo().create({"name": "STYD room", "channel_type": "channel"})
@@ -481,6 +549,22 @@ class TestDiscussRules(DiscussCase):
         self.assertFalse(chats(self.outsider), "only the users who may ask")
         settings.set_values()
         self.assertEqual(len(chats(self.asker)), 1, "opened once")
+        self.assertEqual(len(self.bot_texts(chats(self.asker))), 1, "welcomed once")
+        # never again, even after the user left that chat
+        chats(self.asker).unlink()
+        settings.set_values()
+        self.assertFalse(chats(self.asker), "a user is welcomed once ever")
+        self.ask(self.asker, self.dm(self.asker), "Ventes ?")
+        self.assertFalse([t for t in self.bot_texts(chats(self.asker))
+                          if text_mod.say("welcome", "fr_FR")[:30] in t])
+        # only while the assistant is on
+        self.icp.set_param(discuss.ICP_DISCUSS_ENABLED, False)
+        self.icp.set_param(discuss.ICP_DISCUSS_USERS, str(self.outsider.id))
+        self.assertEqual(self.Question._open_chats(), 0)
+        Settings.create({"styd_discuss_enabled": False, "styd_discuss_audience": "users",
+                         "styd_discuss_user_ids": [Command.set([self.outsider.id])]}).set_values()
+        self.assertFalse(chats(self.outsider), "no chat and no welcome while the assistant is off")
+        self.assertFalse(self.env["styd.discuss.welcome"].sudo().search([("user_id", "=", self.outsider.id)]))
 
     def test_29_hello_features(self):
         stream = self.make_stream(self.row)

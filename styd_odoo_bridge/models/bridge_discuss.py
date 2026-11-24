@@ -10,6 +10,10 @@
     cursor, no sudo), and sends its answer down a poll as a signed
     ``discuss_answer``. The poll thread only stores it (``styd.discuss.inbox``)
     and triggers the job; the job posts it as the bot.
+  * A mention in a channel or a group is answered in the asker's direct chat
+    with the bot (the reads ran with the asker's own rights), and one line in
+    the channel says so, as a reply to the question. The admin setting "Answer
+    mentions in the channel" (off by default) answers in the channel instead.
   * Off by default. An admin chooses who may ask; anyone else gets a free
     "ask your admin" line, with no call to STYD. Per-user and per-database rate
     limits apply before anything is sent.
@@ -48,6 +52,7 @@ ICP_DISCUSS_USERS = "styd_odoo_bridge.discuss_user_ids"
 ICP_DISCUSS_PAIRING = "styd_odoo_bridge.discuss_pairing_id"
 ICP_RATE_USER_HOUR = "styd_odoo_bridge.discuss_rate_user_hour"
 ICP_RATE_DB_HOUR = "styd_odoo_bridge.discuss_rate_db_hour"
+ICP_ANSWER_IN_CHANNEL = "styd_odoo_bridge.discuss_answer_in_channel"
 
 AUDIENCES = ("all", "group", "users")
 DEFAULT_RATE_USER_HOUR = 30
@@ -106,8 +111,13 @@ class StydDiscussQuestion(models.Model):
         default="pending", required=True, index=True,
     )
     user_id = fields.Many2one("res.users", required=True, index=True, ondelete="cascade")
-    channel_id = fields.Many2one("discuss.channel", required=True, ondelete="cascade")
+    channel_id = fields.Many2one("discuss.channel", required=True, ondelete="cascade",
+                                 help="Where the bot answers: the conversation, or the asker's chat with the bot.")
     message_id = fields.Many2one("mail.message", ondelete="set null")
+    origin_channel_id = fields.Many2one(
+        "discuss.channel", ondelete="set null",
+        help="A mention in a channel or group answered in the asker's chat: where it was asked.")
+    origin_notified = fields.Boolean(help="The line 'answered you in a direct message' was posted.")
     pairing_ref = fields.Char(help="pairing_id of the outbound channel used.")
     text = fields.Text(help="The question, kept only until it is sent.")
     truncated = fields.Boolean()
@@ -142,6 +152,7 @@ class StydDiscussQuestion(models.Model):
             "pairing_ref": (icp.get_param(ICP_DISCUSS_PAIRING) or "").strip(),
             "rate_user_hour": _int(icp.get_param(ICP_RATE_USER_HOUR), DEFAULT_RATE_USER_HOUR),
             "rate_db_hour": _int(icp.get_param(ICP_RATE_DB_HOUR), DEFAULT_RATE_DB_HOUR),
+            "answer_in_channel": executor_mod._truthy(icp.get_param(ICP_ANSWER_IN_CHANNEL, "False")),
         }
 
     @api.model
@@ -200,9 +211,14 @@ class StydDiscussQuestion(models.Model):
         bot = self._bot()
         lang = user.lang or "en_US"
         settings = self._settings()
+        # The asker's own chat with the bot; anything else (a channel, a group, a
+        # chat with a colleague) is read by others too.
+        own_chat = channel.channel_type == "chat" and bot in channel.sudo().channel_member_ids.partner_id
 
         def reply(key):
-            self._post_bot(channel, text_mod.bot_line(key, lang))
+            # Free lines say nothing private: posted where the user asked (as a reply
+            # to the question when others read that conversation).
+            self._post_bot(channel, text_mod.bot_line(key, lang), parent=None if own_chat else message)
 
         if not settings["enabled"]:
             reply("disabled")
@@ -232,15 +248,21 @@ class StydDiscussQuestion(models.Model):
             self.create(dict(base, state="blocked", outcome_code=limited, finished_at=fields.Datetime.now()))
             reply(limited)
             return None
-        others = channel.sudo().channel_member_ids.partner_id - bot - user.partner_id
+        answer_channel, origin = channel, False
+        if not own_chat and not settings["answer_in_channel"]:
+            # Owner decision: a mention is answered in the asker's own chat with the bot.
+            answer_channel, origin = self._user_chat(user), channel
+        others = answer_channel.sudo().channel_member_ids.partner_id - bot - user.partner_id
         question = self.create(dict(
             base,
             state="pending",
+            channel_id=answer_channel.id,
+            origin_channel_id=origin and origin.id,
             pairing_ref=pairing.pairing_id,
             text=text,
             truncated=truncated,
-            shared=channel.channel_type != "chat" or bool(others),
-            conversation_kind=channel.channel_type,
+            shared=answer_channel.channel_type != "chat" or bool(others),
+            conversation_kind=answer_channel.channel_type,
         ))
         self._trigger()
         return question
@@ -252,12 +274,14 @@ class StydDiscussQuestion(models.Model):
             cron.sudo()._trigger(at=at)
 
     @api.model
-    def _post_bot(self, channel, body):
+    def _post_bot(self, channel, body, parent=None):
         """Post ``body`` (Markup built by bridge_discuss_text) as the bot, in
-        ``channel`` only. No partner is notified beyond the conversation."""
+        ``channel`` only (as a reply to ``parent`` when given). No partner is
+        notified beyond the conversation."""
         bot = self._bot()
+        values = {"parent_id": parent.id} if parent else {}
         return channel.sudo().message_post(
-            body=body, author_id=bot.id, message_type="comment", subtype_xmlid="mail.mt_comment")
+            body=body, author_id=bot.id, message_type="comment", subtype_xmlid="mail.mt_comment", **values)
 
     def _say(self, key):
         self.ensure_one()
@@ -269,6 +293,18 @@ class StydDiscussQuestion(models.Model):
                     "text": False, "next_try_at": False})
         if say_key:
             self._say(say_key)
+        self._notify_origin()
+
+    def _notify_origin(self):
+        """Once the asker has their reply in the direct chat, one line where they asked."""
+        self.ensure_one()
+        if not self.origin_channel_id or self.origin_notified:
+            return
+        self.origin_notified = True
+        message = self.message_id
+        parent = message if message and message.model == "discuss.channel" \
+            and message.res_id == self.origin_channel_id.id else None
+        self._post_bot(self.origin_channel_id, text_mod.bot_line("answered_in_dm", self.lang), parent=parent)
 
     # ------------------------------------------------------------------
     # the job
@@ -308,6 +344,7 @@ class StydDiscussQuestion(models.Model):
                 "key": "discuss.channel:%d" % self.channel_id.id,
                 "kind": self.conversation_kind or "chat",
                 "shared": bool(self.shared),
+                "asked_in": (self.origin_channel_id or self.channel_id).channel_type,
             },
             "lang": self.lang or "en_US",
             "tz": self.tz or "UTC",
@@ -420,38 +457,61 @@ class StydDiscussQuestion(models.Model):
     # chats with the bot (no change to Discuss screens: the server opens them)
     # ------------------------------------------------------------------
     @api.model
-    def _open_chats(self, limit=OPEN_CHATS_MAX):
-        """Open a direct conversation with the bot for each user who may ask
-        and has none yet, with a welcome line. Returns how many were opened."""
-        settings = self._settings()
+    def _user_chat(self, user):
+        """The user's direct chat with the bot, opened if needed. The welcome line
+        is posted once per user ever, and only while the assistant is on."""
         bot = self._bot()
-        if not settings["enabled"] or not bot:
-            return 0
         Channel = self.env["discuss.channel"].sudo()
-        users = self.env["res.users"].sudo().search([("share", "=", False), ("id", "!=", SUPERUSER_ID)])
+        chat = Channel.search([
+            ("channel_type", "=", "chat"),
+            ("channel_member_ids.partner_id", "=", user.partner_id.id),
+            ("channel_member_ids.partner_id", "=", bot.id),
+        ], limit=1)
+        if not chat:
+            chat = Channel.with_user(user).sudo().channel_get([bot.id], pin=True)
+        Welcome = self.env["styd.discuss.welcome"].sudo()
+        if self._settings()["enabled"] and not Welcome.search_count([("user_id", "=", user.id)]):
+            Welcome.create({"user_id": user.id})
+            self._post_bot(chat, text_mod.bot_line("welcome", user.lang))
+        return chat
+
+    @api.model
+    def _open_chats(self, limit=OPEN_CHATS_MAX):
+        """Open the chat with the bot, with its welcome line, for each user who
+        may ask and was never welcomed (a user welcomed once is never welcomed
+        again, even after leaving that chat). Returns how many were opened."""
+        settings = self._settings()
+        if not settings["enabled"] or not self._bot():
+            return 0
+        welcomed = self.env["styd.discuss.welcome"].sudo().search([]).user_id
+        users = self.env["res.users"].sudo().search([("share", "=", False), ("id", "!=", SUPERUSER_ID)]) - welcomed
         opened = 0
         for user in users:
             if opened >= limit:
                 _logger.info("STYD discuss: %s chats opened, the others open on the next save", opened)
                 break
-            if not self._may_ask(user, settings):
-                continue
-            existing = Channel.search_count([
-                ("channel_type", "=", "chat"),
-                ("channel_member_ids.partner_id", "=", user.partner_id.id),
-                ("channel_member_ids.partner_id", "=", bot.id),
-            ])
-            if existing:
-                continue
-            chat = Channel.with_user(user).sudo().channel_get([bot.id], pin=True)
-            self._post_bot(chat, text_mod.bot_line("welcome", user.lang))
-            opened += 1
+            if self._may_ask(user, settings):
+                self._user_chat(user)
+                opened += 1
         return opened
 
     @api.autovacuum
     def _gc_old_questions(self):
         limit = fields.Datetime.now() - datetime.timedelta(days=KEEP_DAYS)
         self.sudo().search([("create_date", "<", limit), ("state", "not in", OPEN_STATES)]).unlink()
+
+
+class StydDiscussWelcome(models.Model):
+    """Users the bot already welcomed: the welcome line is posted once per user ever."""
+
+    _name = "styd.discuss.welcome"
+    _description = "Speak To Your Database: users welcomed by the Discuss assistant"
+
+    user_id = fields.Many2one("res.users", required=True, index=True, ondelete="cascade")
+
+    _sql_constraints = [
+        ("user_unique", "unique(user_id)", "A user is welcomed once."),
+    ]
 
 
 class StydDiscussInbox(models.Model):

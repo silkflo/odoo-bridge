@@ -72,6 +72,13 @@ class ResConfigSettings(models.TransientModel):
         string="Users who may ask",
         domain=[("share", "=", False)],
     )
+    styd_discuss_answer_in_channel = fields.Boolean(
+        string="Answer mentions in the channel",
+        config_parameter="styd_odoo_bridge.discuss_answer_in_channel",
+        help="Off (default): a mention in a channel or group is answered in a direct message to the "
+             "asker, and one line in the channel says so. On: the answer is posted in the channel, "
+             "where everyone in it can read it (HR questions are then refused).",
+    )
     styd_discuss_pairing = fields.Selection(
         selection="_styd_discuss_pairing_selection",
         string="Workspace answering in Discuss",

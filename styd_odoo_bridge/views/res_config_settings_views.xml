@@ -80,6 +80,14 @@
                                    invisible="styd_discuss_audience != 'users'"/>
                         </setting>
                         <setting
+                            string="Answer mentions in the channel"
+                            help="Off (default): a mention in a channel or group is answered in a direct message to the asker, with one line in the channel saying so. On: the answer is posted in the channel, readable by everyone in it; HR questions are then refused."
+                            id="styd_discuss_answer_in_channel_setting"
+                            invisible="not styd_discuss_enabled"
+                        >
+                            <field name="styd_discuss_answer_in_channel"/>
+                        </setting>
+                        <setting
                             string="Workspace answering in Discuss"
                             help="Only when this Odoo is paired with several Speak To Your Database workspaces."
                             id="styd_discuss_pairing_setting"

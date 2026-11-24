@@ -41,6 +41,15 @@ MESSAGES = {
         "nl": "Hallo, ik ben Speak To Your Database. Stel mij hier vragen over uw Odoo-gegevens, of noem mij in een kanaal. Ik antwoord met uw eigen Odoo-toegangsrechten.",
         "pt": "Olá, sou o Speak To Your Database. Faça-me aqui perguntas sobre os seus dados do Odoo, ou mencione-me num canal. Respondo com os seus próprios acessos do Odoo.",
     },
+    "answered_in_dm": {
+        "en": "I've answered you in a direct message.",
+        "fr": "Je vous ai répondu en message direct.",
+        "es": "Le he respondido en un mensaje directo.",
+        "de": "Ich habe Ihnen in einer Direktnachricht geantwortet.",
+        "it": "Le ho risposto in un messaggio diretto.",
+        "nl": "Ik heb u geantwoord in een direct bericht.",
+        "pt": "Respondi-lhe numa mensagem direta.",
+    },
     "looking": {
         "en": "Looking it up…",
         "fr": "Je cherche…",
