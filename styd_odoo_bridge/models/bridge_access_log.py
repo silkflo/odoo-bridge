@@ -65,3 +65,24 @@ class StydOdooBridgeAccessLog(models.Model):
         readonly=True,
         help="Short, safe detail. Never contains tokens, headers, or business data.",
     )
+
+    # Outbound channel rows (endpoint "channel:<op>"). Never data or domain values.
+    member_uid = fields.Integer(
+        string="Odoo User Id",
+        readonly=True,
+        help="Odoo user the channel read ran as (0 for control messages).",
+    )
+    pairing_ref = fields.Char(
+        string="Pairing",
+        readonly=True,
+        help="Channel pairing id (not a secret).",
+    )
+    duration_ms = fields.Float(
+        string="Duration (ms)",
+        readonly=True,
+        digits=(16, 1),
+    )
+    row_count = fields.Integer(
+        string="Rows",
+        readonly=True,
+    )

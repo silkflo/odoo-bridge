@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Optional restriction of the outbound channel: when "Only members of the
+         STYD group" is on, STYD may read only as users in this group. -->
+    <record id="group_styd_member" model="res.groups">
+        <field name="name">Speak To Your Database: member</field>
+        <field name="comment">Speak To Your Database may answer questions as this Odoo user over the outbound channel, when the Bridge setting "Only members of the STYD group" is on. Off by default: every active internal user may be asked as.</field>
+    </record>
+</odoo>
