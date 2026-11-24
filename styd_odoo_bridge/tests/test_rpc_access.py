@@ -2,7 +2,9 @@
 
 Each call goes the way Odoo's /web/dataset/call_kw and XML-RPC go on this
 version (the private-name gate, then call_kw), as an ordinary internal user
-and as a portal user. Odoo 15 to 20.
+and as a portal user. Odoo 15 to 20. The 0.10.2 security fix's tests, plus the
+outbound channel's models (pairing wizard, pairings, seen ids) and the Discuss
+assistant's models.
 """
 
 import inspect
@@ -30,16 +32,20 @@ if MAJOR >= 17:
 if MAJOR >= 19:
     SETUP_ACTIONS |= {"action_open_bridge_status"}
 STATUS_ACTIONS = {"action_refresh_status", "action_open_access_logs", "action_open_connection_setup"}
+CHANNEL_ACTIONS = {"action_refresh", "action_show_code", "action_cancel_code", "action_unpair", "action_rotate",
+                   "action_forget"}
+DISCUSS_CHANNEL = "discuss.channel" if MAJOR >= 17 else "mail.channel"
 
 # Every public method this module defines on an Odoo model (each is guarded).
 REVIEWED_PUBLIC = {
     "styd.odoo.bridge.setup.wizard": {"default_get"} | SETUP_ACTIONS,
+    "styd.odoo.bridge.channel.wizard": {"default_get"} | CHANNEL_ACTIONS,
     "res.config.settings": {"get_values", "set_values"},
 }
 MODULE_MODELS = ["styd.odoo.bridge.service", "styd.odoo.bridge.orm", "styd.odoo.bridge.setup.wizard",
-                 "res.config.settings"]
-if MAJOR >= 17:
-    MODULE_MODELS.append("styd.odoo.bridge.access.log")
+                 "res.config.settings", "styd.odoo.bridge.channel.wizard", "styd.odoo.bridge.channel",
+                 "styd.odoo.bridge.pairing", "styd.odoo.bridge.channel.seen", "styd.odoo.bridge.access.log",
+                 "styd.discuss.question", "styd.discuss.inbox", "styd.discuss.welcome", DISCUSS_CHANNEL]
 if MAJOR >= 19:
     MODULE_MODELS.append("styd.odoo.bridge.status")
     REVIEWED_PUBLIC["styd.odoo.bridge.status"] = set(STATUS_ACTIONS)
@@ -48,13 +54,17 @@ if MAJOR >= 19:
 FORMER_PUBLIC = {
     "styd.odoo.bridge.service": [
         ("get_supported_features", []), ("build_health_payload", []), ("build_security_snapshot_payload", []),
-        ("build_user_directory_snapshot_payload", []), ("build_capability_snapshot_payload", []),
+        ("build_user_directory_snapshot_payload", []), ("build_user_search_payload", ["a"]),
+        ("build_capability_snapshot_payload", []),
     ],
     "styd.odoo.bridge.orm": [
         ("orm_list_models", []), ("orm_model_fields", ["res.partner"]), ("orm_search_read", ["res.partner"]),
         ("orm_read_group", ["res.partner"]),
     ],
 }
+# Tables with secrets, ids or logs: no read for anyone but the system.
+CLOSED_MODELS = ("styd.odoo.bridge.pairing", "styd.odoo.bridge.channel.seen", "styd.odoo.bridge.access.log",
+                 "styd.discuss.question", "styd.discuss.inbox", "styd.discuss.welcome")
 
 
 @tagged("post_install", "-at_install")
@@ -63,9 +73,9 @@ class TestRpcAccess(TransactionCase):
         super().setUp()
         self.icp = self.env["ir.config_parameter"].sudo()
         self.admin = self.env.ref("base.user_admin")
-        self.icp.set_param("styd_odoo_bridge.enabled", "True")
-        self.icp.set_param("styd_odoo_bridge.connector_owner_user_id", str(self.admin.id))
-        self.icp.set_param("styd_odoo_bridge.token_hash", "a" * 64)
+        self.set_icp("styd_odoo_bridge.enabled", "True")
+        self.set_icp("styd_odoo_bridge.connector_owner_user_id", str(self.admin.id))
+        self.set_icp("styd_odoo_bridge.token_hash", "a" * 64)
         Users = self.env["res.users"].with_context(no_reset_password=True)
         gfield = "group_ids" if MAJOR >= 19 else "groups_id"
         self.internal = Users.create({
@@ -77,6 +87,13 @@ class TestRpcAccess(TransactionCase):
             gfield: [Command.set([self.env.ref("base.group_portal").id])],
         })
         self.outsiders = (self.internal, self.portal)
+
+    # Odoo 20 replaced get_param / set_param with get_str / set_str.
+    def set_icp(self, key, value):
+        return self.icp.set_str(key, value) if hasattr(self.icp, "set_str") else self.icp.set_param(key, value)
+
+    def get_icp(self, key):
+        return self.icp.get_str(key) if hasattr(self.icp, "get_str") else self.icp.get_param(key)
 
     # -- the RPC path of this version -------------------------------------------
     def rpc(self, user, model, method, args=(), kwargs=None):
@@ -142,8 +159,8 @@ class TestRpcAccess(TransactionCase):
         self.assertRefused("styd.odoo.bridge.setup.wizard", "default_get", [["bridge_enabled", "base_url"]])
         self.assertRefused("styd.odoo.bridge.setup.wizard", "onchange",
                            [[], {}, [], self.form_spec(["bridge_enabled", "token_configured", "base_url"])])
-        self.assertEqual(self.icp.get_param("styd_odoo_bridge.enabled"), "True", "not switched off")
-        self.assertEqual(self.icp.get_param("styd_odoo_bridge.token_hash"), "a" * 64, "token not revoked")
+        self.assertEqual(self.get_icp("styd_odoo_bridge.enabled"), "True", "not switched off")
+        self.assertEqual(self.get_icp("styd_odoo_bridge.token_hash"), "a" * 64, "token not revoked")
 
     def test_21_status_page(self):
         if MAJOR < 19:
@@ -157,12 +174,17 @@ class TestRpcAccess(TransactionCase):
     def test_22_settings(self):
         self.assertRefused("res.config.settings", "get_values", self.ids_args("res.config.settings", "get_values"))
         self.assertRefused("res.config.settings", "set_values", [[]])
-        self.assertEqual(self.icp.get_param("styd_odoo_bridge.enabled"), "True")
+        self.assertEqual(self.get_icp("styd_odoo_bridge.enabled"), "True")
 
-    def test_23_audit_log(self):
-        if MAJOR < 17:
-            self.skipTest("no audit log model before 17.0")
-        self.assertRefused("styd.odoo.bridge.access.log", "search_read", [[]])
+    def test_23_secret_tables_and_log(self):
+        for model in CLOSED_MODELS:
+            self.assertRefused(model, "search_read", [[]])
+
+    def test_24_channel_wizard(self):
+        wizard = self.env["styd.odoo.bridge.channel.wizard"].with_user(self.admin).create({})
+        for method in sorted(CHANNEL_ACTIONS):
+            self.assertRefused("styd.odoo.bridge.channel.wizard", method, [wizard.ids])
+        self.assertRefused("styd.odoo.bridge.channel.wizard", "default_get", [["owner_user_id", "pairings_html"]])
 
     # -- the admin keeps working -------------------------------------------------------
     def test_30_admin_still_allowed(self):
@@ -174,3 +196,6 @@ class TestRpcAccess(TransactionCase):
         wizard = self.env["styd.odoo.bridge.setup.wizard"].with_user(self.admin).create({})
         action = self.rpc(self.admin, "styd.odoo.bridge.setup.wizard", "action_save_settings", [wizard.ids])
         self.assertEqual(action["res_model"], "styd.odoo.bridge.setup.wizard")
+        channel_wizard = self.env["styd.odoo.bridge.channel.wizard"].with_user(self.admin).create({})
+        self.assertEqual(self.rpc(self.admin, "styd.odoo.bridge.channel.wizard", "action_refresh",
+                                  [channel_wizard.ids])["res_model"], "styd.odoo.bridge.channel.wizard")

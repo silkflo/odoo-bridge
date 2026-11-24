@@ -13,6 +13,7 @@ from odoo.http import request
 from odoo.addons.styd_odoo_bridge.models.bridge_orm import (
     ORM_ACCESS_MODE,
     StydOrmError,
+    _json_default,
 )
 
 _logger = logging.getLogger(__name__)
@@ -120,26 +121,7 @@ class StydBridgeApi(http.Controller):
         return request.env["styd.odoo.bridge.service"].sudo()
 
     def _build_user_search_payload(self, service, query):
-        directory = service._build_user_directory_snapshot_payload()
-        users = directory.get("users", [])
-
-        q = str(query or "").strip().lower()
-        if q:
-            users = [
-                user for user in users
-                if q in str(user.get("login") or "").lower()
-                or q in str(user.get("name") or "").lower()
-                or q in str(user.get("email") or "").lower()
-            ]
-
-        return {
-            "bridge_version": directory.get("bridge_version"),
-            "snapshot_version": directory.get("snapshot_version"),
-            "generated_at_utc": directory.get("generated_at_utc"),
-            "query": query or "",
-            "count": len(users),
-            "users": users,
-        }
+        return service._build_user_search_payload(query)
 
     @http.route(
         "/styd_bridge/v1/health",
@@ -388,6 +370,8 @@ class StydBridgeApi(http.Controller):
                 order=body.get("order"),
                 tz=body.get("tz"),
                 tz_mode=body.get("tz_mode"),
+                lang=body.get("lang"),
+                company_ids=body.get("company_ids"),
             )
         except StydOrmError as exc:
             return self._error_response(exc.code, exc.message, status=400)
@@ -432,6 +416,8 @@ class StydBridgeApi(http.Controller):
                 order=body.get("order"),
                 tz=body.get("tz"),
                 tz_mode=body.get("tz_mode"),
+                lang=body.get("lang"),
+                company_ids=body.get("company_ids"),
             )
         except StydOrmError as exc:
             return self._error_response(exc.code, exc.message, status=400)

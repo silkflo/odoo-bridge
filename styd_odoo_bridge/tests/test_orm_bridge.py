@@ -336,11 +336,21 @@ class TestStydOrmBridge(TransactionCase):
             "stock.quant", "stock.location", "stock.move", "stock.move.line",
             "stock.picking", "stock.picking.type", "stock.warehouse",
             "stock.warehouse.orderpoint", "stock.lot",
+            "stock.production.lot",  # Odoo 15's lots (what STYD reads on 15)
             "purchase.order", "purchase.order.line",
             "crm.lead", "crm.stage", "crm.team", "crm.tag",
             "project.project", "project.task", "project.tags",
             "mrp.production", "mrp.workorder", "mrp.bom", "mrp.bom.line", "mrp.routing",
             "maintenance.equipment", "maintenance.request", "maintenance.team",
+            # M-R2 (B0_AUDIT): what STYD reads on an API key
+            "pos.order", "pos.order.line", "pos.session", "pos.config", "pos.payment",
+            "pos.payment.method", "report.pos.order",
+            "account.bank.statement", "account.bank.statement.line", "account.partial.reconcile",
+            "account.analytic.line", "account.analytic.account", "account.analytic.plan",
+            "stock.valuation.layer", "mrp.workcenter", "mrp.workcenter.productivity",
+            "mrp.workcenter.productivity.loss", "mrp.routing.workcenter", "mrp.unbuild",
+            "project.task.type", "project.project.stage", "project.milestone", "project.update",
+            "res.currency.rate",
         }
         self.assertEqual(set(self.orm.MODEL_ALLOWLIST), expected)
         forbidden = {

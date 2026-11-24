@@ -1,6 +1,6 @@
 import secrets
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import AccessError
 
 
@@ -50,10 +50,10 @@ class StydOdooBridgeSetupWizard(models.TransientModel):
     has_generated_token = fields.Boolean(compute="_compute_generated_token")
 
     def _check_admin(self):
-        """Buttons and form values are for Odoo administrators only: they run
-        through sudo helpers, so an RPC call by anyone else is refused."""
+        """Every button and the form's values are for Odoo administrators only:
+        they run through sudo helpers, so an RPC call by anyone else is refused."""
         if not (self.env.su or self.env.user._is_system()):
-            raise AccessError("Only an Odoo administrator can manage the Speak To Your Database Bridge.")
+            raise AccessError(_("Only an Odoo administrator can manage the Speak To Your Database Bridge."))
 
     @api.model
     def default_get(self, fields_list):
