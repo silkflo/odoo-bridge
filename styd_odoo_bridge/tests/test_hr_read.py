@@ -34,6 +34,23 @@ STYD_HR_FIELDS = {
                             "work_entry_type_id", "type_request_unit"},
     "hr.attendance": {"id", "employee_id", "check_in", "check_out", "worked_hours"},
 }
+class MemberOrm:
+    """The ORM as the channel calls it for a member: the entry points with
+    ``member_rights=True`` and the pairing's owner."""
+
+    ENTRY_POINTS = ("_orm_list_models", "_orm_model_fields", "_orm_search_read", "_orm_read_group")
+
+    def __init__(self, orm, owner_uid):
+        self._orm = orm
+        self._owner_uid = owner_uid
+
+    def __getattr__(self, name):
+        if name in self.ENTRY_POINTS:
+            method = getattr(self._orm, name)
+            return lambda *a, **kw: method(*a, member_rights=True, owner_uid=self._owner_uid, **kw)
+        return getattr(self._orm._orm_mode(True, self._owner_uid), name)
+
+
 NEVER = ("hr.employee", "hr.contract", "hr.job", "hr.payslip", "hr.expense", "hr.applicant", "hr.version",
          "resource.calendar", "res.partner.bank")
 
@@ -113,7 +130,8 @@ class TestHrRead(ChannelCase):
                                             "check_out": "2026-03-04 16:00:00"})
         self.att_other = Attendance.create({"employee_id": self.emp_other.id, "check_in": "2026-03-04 09:00:00",
                                             "check_out": "2026-03-04 17:00:00"})
-        self.pairing = {"pairing_id": "bp_" + "H" * 22, "owner_uid": self.admin.id}
+        # An approved pairing of this database (the executor reads its row).
+        self.pairing = {"pairing_id": self.make_pairing().pairing_id, "owner_uid": self.admin.id}
 
     # -- helpers ------------------------------------------------------------------------
     def run_op(self, op, args, member):
@@ -126,8 +144,9 @@ class TestHrRead(ChannelCase):
         return out
 
     def member_orm(self, user):
-        ctx = ex.member_context(user, self.admin.id)
-        return self.env["styd.odoo.bridge.orm"].with_user(user).with_context(**ctx)
+        ctx = ex.member_context(user)
+        orm = self.env["styd.odoo.bridge.orm"].with_user(user).with_context(**ctx)
+        return MemberOrm(orm, self.admin.id)
 
     def assertRefused(self, codes, fn, *args, **kwargs):
         with self.assertRaises(StydOrmError) as ctx:
@@ -305,34 +324,22 @@ class TestPayOnAnalyticLines(ChannelCase):
         journal_item = orm._orm_journal_item_field(model)  # move_id on Odoo 15
         journal_items = [[journal_item, "!=", False]]
 
-        def refused(**kw):
+        def refused(code, **kw):
             with self.assertRaises(StydOrmError) as ctx:
                 (orm._orm_read_group if "group_by" in kw or "aggregates" in kw else orm._orm_search_read)(model, **kw)
-            self.assertEqual(ctx.exception.code, "field_not_allowed", kw)
+            self.assertEqual(ctx.exception.code, code, kw)
 
-        # A timesheet line's amount is pay: never without the journal-item filter.
-        refused(fields=["amount"])
-        refused(fields=["name"], domain=[["amount", "<", 0]])
-        refused(fields=["name"], order="amount desc")
-        refused(group_by=["account_id"], aggregates=["amount:sum"])
-        refused(fields=["amount"], domain=["|", [journal_item, "!=", False], ["id", ">", 0]])
-        refused(fields=["amount"], domain=["!", [journal_item, "=", False]])
-        refused(fields=["amount"], domain=[[journal_item, "=", False]])
+        # Not journal-items-only: a timesheet read, which follows the HR rules and is
+        # never served by the sudo routes (the amount with it).
+        refused("model_not_allowed", fields=["amount"])
+        refused("model_not_allowed", fields=["name"], domain=[["amount", "<", 0]])
+        refused("model_not_allowed", fields=["name"], order="amount desc")
+        refused("model_not_allowed", group_by=["account_id"], aggregates=["amount:sum"])
+        refused("model_not_allowed", fields=["amount"], domain=["|", [journal_item, "!=", False], ["id", ">", 0]])
+        refused("model_not_allowed", fields=["amount"], domain=["!", [journal_item, "=", False]])
+        refused("model_not_allowed", fields=["amount"], domain=[[journal_item, "=", False]])
+        refused("model_not_allowed", fields=["unit_amount", "name", "date"])
         # The ledger reader's reads stay open.
         self.assertIn("records", orm._orm_search_read(model, fields=["amount", "date"], domain=journal_items))
         self.assertIn("groups", orm._orm_read_group(model, group_by=["account_id"], aggregates=["amount:sum"],
                                                     domain=journal_items + [["date", ">=", "2026-01-01"]]))
-        # A read naming no field gets everything but the pay (named, it is refused above).
-        account = {"name": "STYD cost centre"}
-        if "account.analytic.plan" in self.env:  # analytic plans since Odoo 16
-            account["plan_id"] = self.env["account.analytic.plan"].create({"name": "STYD plan"}).id
-        self.env["account.analytic.line"].create({
-            "name": "STYD timesheet-like line", "amount": -123.45, "unit_amount": 2,
-            "account_id": self.env["account.analytic.account"].create(account).id,
-        })
-        out = orm._orm_search_read(model, domain=[["name", "=", "STYD timesheet-like line"]])
-        self.assertEqual(out["returned_count"], 1)
-        self.assertNotIn("amount", out["records"][0])
-        self.assertEqual(out["records"][0]["unit_amount"], 2)
-        # Hours, not pay: open as before.
-        self.assertIn("records", orm._orm_search_read(model, fields=["unit_amount", "name", "date"]))

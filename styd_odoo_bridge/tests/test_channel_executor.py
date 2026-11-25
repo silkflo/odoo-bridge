@@ -35,7 +35,8 @@ class TestChannelExecutor(ChannelCase):
             GROUPS: [Command.set([group_user.id])],
         })
         self.inactive.active = False
-        self.pairing = {"pairing_id": "bp_" + "E" * 22, "owner_uid": self.admin.id}
+        # An approved pairing of this database (the executor reads its row).
+        self.pairing = {"pairing_id": self.make_pairing().pairing_id, "owner_uid": self.admin.id}
 
     def run_op(self, op, args=None, member=None, member_uid=None, timeout_ms=None):
         self.sync()
@@ -213,11 +214,13 @@ class TestChannelExecutor(ChannelCase):
     def test_14_member_context(self):
         company2 = self.env["res.company"].create({"name": "STYD second company"})
         self.member.write({"company_ids": [Command.link(company2.id)], "tz": "Europe/Paris", "lang": "en_US"})
-        ctx = ex.member_context(self.member, self.admin.id)
+        ctx = ex.member_context(self.member)
         self.assertEqual(ctx["allowed_company_ids"][0], self.member.company_id.id)
         self.assertEqual(set(ctx["allowed_company_ids"]), set(self.member.company_ids.ids))
         self.assertEqual(ctx["tz"], "Europe/Paris")
-        self.assertTrue(ctx["styd_bridge_member_rights"])
+        # Member rights and the owner are explicit arguments, never context keys.
+        self.assertNotIn("styd_bridge_member_rights", ctx)
+        self.assertNotIn("styd_bridge_connector_owner_uid", ctx)
 
     def test_15_lang_and_company_ids_in_member_mode(self):
         """M-R4/M-R5 over the channel: validated against the member's own languages and companies."""

@@ -341,13 +341,12 @@ class StydOdooBridgeService(models.AbstractModel):
         self._icp_set("styd_odoo_bridge.token", False)
         return True
 
-    def _get_connector_owner_user_id(self):
+    def _get_connector_owner_user_id(self, owner_uid=None):
         # The outbound channel runs owner-only reads for the pairing's own owner
-        # (the connector owner chosen at pairing), passed in the context.
-        channel_owner = self.env.context.get("styd_bridge_connector_owner_uid")
-        if channel_owner:
+        # (the connector owner chosen at pairing), passed as an explicit argument.
+        if owner_uid:
             try:
-                return int(channel_owner)
+                return int(owner_uid)
             except Exception:
                 return None
         raw = self._get_icp().get_param("styd_odoo_bridge.connector_owner_user_id", default="")
@@ -358,8 +357,8 @@ class StydOdooBridgeService(models.AbstractModel):
         except Exception:
             return None
 
-    def _get_connector_owner(self):
-        user_id = self._get_connector_owner_user_id()
+    def _get_connector_owner(self, owner_uid=None):
+        user_id = self._get_connector_owner_user_id(owner_uid)
         if not user_id:
             raise ValueError(
                 "Bridge connector owner is not configured. "
@@ -380,7 +379,7 @@ class StydOdooBridgeService(models.AbstractModel):
     def _get_database_uuid(self):
         return self._get_icp().get_param("database.uuid", default="") or None
 
-    def _get_bridge_tz(self):
+    def _get_bridge_tz(self, owner_uid=None):
         """IANA time zone the bridge reports and applies with tz_mode="company".
 
         Odoo has no company time zone field, so this uses, in order: the
@@ -388,7 +387,7 @@ class StydOdooBridgeService(models.AbstractModel):
         partner, the main company partner's time zone, then UTC.
         """
         candidates = []
-        user_id = self._get_connector_owner_user_id()
+        user_id = self._get_connector_owner_user_id(owner_uid)
         if user_id:
             user = self.env["res.users"].sudo().browse(user_id)
             if user.exists():
@@ -850,7 +849,7 @@ class StydOdooBridgeService(models.AbstractModel):
                 })
         return payload    
 
-    def _build_configuration_hints_payload(self):
+    def _build_configuration_hints_payload(self, owner_uid=None):
         return {
             "base_url": self._get_base_url(),
             "database_uuid": self._get_database_uuid(),
@@ -858,7 +857,7 @@ class StydOdooBridgeService(models.AbstractModel):
             "odoo_series": self._get_odoo_series(),
             "edition": self._get_edition(),
             "multi_company_enabled": self.env["res.company"].sudo().search_count([]) > 1,
-            "timezone": self._get_bridge_tz(),
+            "timezone": self._get_bridge_tz(owner_uid),
         }
 
     def _build_business_capability_snapshot(self, installed_modules):
@@ -935,7 +934,7 @@ class StydOdooBridgeService(models.AbstractModel):
 
         return payload
 
-    def _build_health_payload(self):
+    def _build_health_payload(self, owner_uid=None):
         return {
             "ok": True,
             "bridge_version": self.BRIDGE_VERSION,
@@ -944,12 +943,12 @@ class StydOdooBridgeService(models.AbstractModel):
             "edition": self._get_edition(),
             "database_uuid": self._get_database_uuid(),
             "server_time_utc": self._utc_now_iso(),
-            "timezone": self._get_bridge_tz(),
+            "timezone": self._get_bridge_tz(owner_uid),
             "supported_features": self._get_supported_features(),
         }
 
-    def _build_security_snapshot_payload(self):
-        user = self._get_connector_owner()
+    def _build_security_snapshot_payload(self, owner_uid=None):
+        user = self._get_connector_owner(owner_uid)
 
         company_scope = self._build_company_scope_payload(user)
         model_access = self._build_model_access_payload(user)
@@ -1005,7 +1004,7 @@ class StydOdooBridgeService(models.AbstractModel):
             "users": users,
         }
 
-    def _build_capability_snapshot_payload(self):
+    def _build_capability_snapshot_payload(self, owner_uid=None):
         installed_modules = self._build_installed_modules_payload()
         available_models = self._build_available_models_payload()
         fields_payload = self._build_fields_payload()
@@ -1022,13 +1021,13 @@ class StydOdooBridgeService(models.AbstractModel):
                 "odoo_version": self._get_odoo_version(),
                 "odoo_series": self._get_odoo_series(),
                 "edition": self._get_edition(),
-                "timezone": self._get_bridge_tz(),
+                "timezone": self._get_bridge_tz(owner_uid),
             },
             "installed_modules": installed_modules,
             "available_models": available_models,
             "fields": fields_payload,
             "relations": relations_payload,
             "selection_values": selection_values_payload,
-            "configuration_hints": self._build_configuration_hints_payload(),
+            "configuration_hints": self._build_configuration_hints_payload(owner_uid),
             "business_capability_snapshot": self._build_business_capability_snapshot(installed_modules),
         }

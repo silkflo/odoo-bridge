@@ -33,7 +33,7 @@ if MAJOR >= 19:
     SETUP_ACTIONS |= {"action_open_bridge_status"}
 STATUS_ACTIONS = {"action_refresh_status", "action_open_access_logs", "action_open_connection_setup"}
 CHANNEL_ACTIONS = {"action_refresh", "action_show_code", "action_cancel_code", "action_unpair", "action_rotate",
-                   "action_forget"}
+                   "action_forget", "action_approve", "action_refuse"}
 DISCUSS_CHANNEL = "discuss.channel" if MAJOR >= 17 else "mail.channel"
 
 # Every public method this module defines on an Odoo model (each is guarded).
@@ -41,6 +41,8 @@ REVIEWED_PUBLIC = {
     "styd.odoo.bridge.setup.wizard": {"default_get"} | SETUP_ACTIONS,
     "styd.odoo.bridge.channel.wizard": {"default_get"} | CHANNEL_ACTIONS,
     "res.config.settings": {"get_values", "set_values"},
+    # Odoo's own method, overridden only to refuse the assistant as the author.
+    DISCUSS_CHANNEL: {"message_post"},
 }
 MODULE_MODELS = ["styd.odoo.bridge.service", "styd.odoo.bridge.orm", "styd.odoo.bridge.setup.wizard",
                  "res.config.settings", "styd.odoo.bridge.channel.wizard", "styd.odoo.bridge.channel",

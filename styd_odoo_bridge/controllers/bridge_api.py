@@ -10,6 +10,7 @@ from odoo.http import request
 # live in bridge_orm.py and are identical to 17.0.
 from odoo.addons.styd_odoo_bridge.models.bridge_orm import (
     ORM_ACCESS_MODE,
+    ORM_INTERNAL_CTX_KEYS,
     StydOrmError,
     _json_default,
 )
@@ -106,8 +107,14 @@ class StydBridgeApi(http.Controller):
 
         return {"ok": True}
 
+    def _clean_model(self, name):
+        """``name`` with sudo, and without the module's internal context keys
+        (member rights, the connector owner): a request never sets them."""
+        model = request.env[name].sudo()
+        return model.with_context({k: v for k, v in model.env.context.items() if k not in ORM_INTERNAL_CTX_KEYS})
+
     def _get_service(self):
-        return request.env["styd.odoo.bridge.service"].sudo()
+        return self._clean_model("styd.odoo.bridge.service")
 
     def _build_user_search_payload(self, service, query):
         return service._build_user_search_payload(query)
@@ -236,7 +243,7 @@ class StydBridgeApi(http.Controller):
     # health/security/users/capabilities endpoints above.
     # ------------------------------------------------------------------
     def _get_orm(self):
-        return request.env["styd.odoo.bridge.orm"].sudo()
+        return self._clean_model("styd.odoo.bridge.orm")
 
     def _parse_json_body(self):
         """Parse the request body as a JSON object. Returns {} for an empty
