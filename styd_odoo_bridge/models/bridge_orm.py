@@ -12,9 +12,14 @@ ORM_ACCESS_MODE = "sudo_company_scoped"
 # member's own Odoo user, under that user's access rights and record rules.
 ORM_MEMBER_ACCESS_MODE = "member_rights"
 
-# Context key the channel executor sets: the ORM primitives below then read as
-# env.user (no sudo) and scope companies to env.companies (the member's own).
+# Internal context keys, set ONLY by the ORM entry points from their explicit
+# ``member_rights`` and ``owner_uid`` arguments (a caller's context never sets
+# them: the entry points overwrite both, and the HTTP routes strip both). With
+# member rights the primitives read as env.user (no sudo) and scope companies
+# to env.companies (the member's own).
 ORM_MEMBER_RIGHTS_CTX = "styd_bridge_member_rights"
+ORM_OWNER_CTX = "styd_bridge_connector_owner_uid"
+ORM_INTERNAL_CTX_KEYS = (ORM_MEMBER_RIGHTS_CTX, ORM_OWNER_CTX)
 
 # Datetime values in search-read records, when a tz is applied (tz_aware_v1).
 ORM_TZ_DATETIME_FORMAT = "iso8601_offset"
@@ -197,6 +202,19 @@ ORM_HR_COMPANY_SCOPE = {
 # plain AND domain (never under an "|" or "!" that could undo it). On Odoo 15 the
 # journal item of an analytic line is ``move_id``: ["move_id", "!=", False] there.
 ORM_PAY_ON_LINES = {"account.analytic.line": frozenset({"amount"})}
+
+# Timesheet lines follow the HR rules (odooHrAccess.ts, the 9th model of its
+# list): a read of account.analytic.line that is not journal-items-only (the
+# check above) is HR. The HTTP routes (sudo) refuse it; over the channel it is
+# read as the member, names its fields, touches only these 11 and is scoped to
+# the employees of the read's companies (and the line's own company).
+ORM_TIMESHEET_MODEL = "account.analytic.line"
+ORM_TIMESHEET_FIELDS = (
+    "id", "employee_id", "user_id", "date", "unit_amount", "name", "project_id", "task_id",
+    "department_id", "company_id", "holiday_id",
+)
+# Same shape as ORM_HR_COMPANY_SCOPE: the employees of the companies, and the line's company.
+ORM_TIMESHEET_COMPANY_SCOPE = ("employees", "company_id")
 # A field is forbidden if its lowercased name CONTAINS any of these substrings.
 ORM_FORBIDDEN_FIELD_SUBSTRINGS = (
     "password", "passwd", "token", "api_key", "secret", "oauth",
@@ -330,6 +348,20 @@ class StydOdooBridgeOrm(models.AbstractModel):
         """True when the outbound channel runs this read as the member (no sudo)."""
         return bool(self.env.context.get(ORM_MEMBER_RIGHTS_CTX))
 
+    def _orm_mode(self, member_rights=False, owner_uid=None):
+        """This model for one read, from the entry point's explicit arguments:
+        whatever the caller's context said about member rights or the owner is
+        replaced."""
+        ctx = {k: v for k, v in self.env.context.items() if k not in ORM_INTERNAL_CTX_KEYS}
+        if member_rights:
+            ctx[ORM_MEMBER_RIGHTS_CTX] = True
+        if owner_uid:
+            ctx[ORM_OWNER_CTX] = int(owner_uid)
+        return self.with_context(ctx)
+
+    def _orm_owner_uid(self):
+        return self.env.context.get(ORM_OWNER_CTX) or None
+
     def _orm_base(self, model_name):
         """The model to read: sudo for the HTTP routes, the member's own env for the channel."""
         model = self.env[model_name]
@@ -386,8 +418,10 @@ class StydOdooBridgeOrm(models.AbstractModel):
                 return owner.company_ids
         return self.env["res.company"].sudo().search([])
 
-    def _orm_company_domain(self, model_name, companies):
+    def _orm_company_domain(self, model_name, companies, timesheet=False):
         model = self.env[model_name].sudo()
+        if timesheet:
+            return self._orm_timesheet_company_domain(companies)
         if model_name in ORM_HR_COMPANY_SCOPE:
             return self._orm_hr_company_domain(model_name, model, companies)
         if "company_id" in model._fields:
@@ -417,6 +451,31 @@ class StydOdooBridgeOrm(models.AbstractModel):
             return ["|", (field, "=", False), (field, "in", companies.ids)]
         return [(field, "in", companies.ids)]
 
+    def _orm_timesheet_company_domain(self, companies):
+        """STYD's scope for timesheet lines: the line's company is one of the read's
+        companies, and its employee works for one of them (archived included)."""
+        employees = self.env["hr.employee.public"].with_context(active_test=False)._search(
+            [("company_id", "in", companies.ids)])
+        return [("company_id", "in", companies.ids), ("employee_id", "in", employees)]
+
+    def _orm_is_timesheet_read(self, model, domain):
+        return model == ORM_TIMESHEET_MODEL and not self._orm_journal_items_only(domain, model)
+
+    def _orm_check_timesheet(self, model, domain, named):
+        """True for a timesheet read (HR), which may go on; raise when refused."""
+        if not self._orm_is_timesheet_read(model, domain):
+            return False
+        if not self._orm_member_rights():
+            raise StydOrmError(
+                "model_not_allowed",
+                "Timesheet lines are read over the outbound channel only, as the asking member's own Odoo "
+                "user (journal-item lines: add [\"%s\", \"!=\", false])." % self._orm_journal_item_field(model))
+        if not named:
+            raise StydOrmError("field_not_allowed", "A timesheet read must name its fields.")
+        if "employee_id" not in self.env[model]._fields or "hr.employee.public" not in self.env:
+            raise StydOrmError("model_not_allowed", "Timesheet lines need the Timesheets app.")
+        return True
+
     def _orm_hr_require_named(self, model, named):
         if model in ORM_HR_MODELS and not named:
             raise StydOrmError("field_not_allowed", "An HR read must name its fields.")
@@ -435,12 +494,14 @@ class StydOdooBridgeOrm(models.AbstractModel):
         return "move_line_id" if model in self.env and "move_line_id" in self.env[model]._fields else "move_id"
 
     def _orm_journal_items_only(self, domain, model):
-        """A plain AND domain (no "|" or "!") with [<journal item>, "!=", False]."""
+        """A plain AND domain (no "|" or "!") with [<journal item>, "!=", False].
+        Also used on a raw domain (the shared-conversation guard): anything
+        malformed is not journal-items-only."""
         field = self._orm_journal_item_field(model)
-        leaves = domain or []
+        leaves = domain if isinstance(domain, (list, tuple)) else []
         plain = not any(isinstance(t, str) and t in ("|", "!") for t in leaves)
         return plain and any(
-            not isinstance(t, str) and t[0] == field and t[1] == "!=" and t[2] is False
+            isinstance(t, (list, tuple)) and len(t) == 3 and t[0] == field and t[1] == "!=" and t[2] is False
             for t in leaves)
 
     def _orm_default_fields_without_pay(self, model, fields, safe_fields, domain):
@@ -455,6 +516,8 @@ class StydOdooBridgeOrm(models.AbstractModel):
         """The HR field wall, then pay on analytic lines. Called after the
         validators, on their normalised output."""
         allowed = ORM_HR_FIELDS.get(model)
+        if allowed is None and self._orm_is_timesheet_read(model, domain):
+            allowed = ORM_TIMESHEET_FIELDS
         if allowed is not None:
             for fname in touched:
                 if fname not in allowed:
@@ -697,7 +760,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
             return tz
         if tz_mode != "company":
             raise StydOrmError("tz_invalid", 'tz_mode must be "company".')
-        return self.env["styd.odoo.bridge.service"]._get_bridge_tz()
+        return self.env["styd.odoo.bridge.service"]._get_bridge_tz(owner_uid=self._orm_owner_uid())
 
     def _orm_resolve_lang(self, lang=None):
         """M-R4: a language for the read's names, or None (the default). Only an
@@ -837,7 +900,8 @@ class StydOdooBridgeOrm(models.AbstractModel):
             orderby=order,
         )
 
-    def _orm_list_models(self):
+    def _orm_list_models(self, member_rights=False, owner_uid=None):
+        self = self._orm_mode(member_rights, owner_uid)  # this read's mode, from the arguments
         out = []
         # M-R6: HR models are listed only over the channel (as the member); the
         # sudo routes never list or read them.
@@ -858,7 +922,8 @@ class StydOdooBridgeOrm(models.AbstractModel):
             })
         return out
 
-    def _orm_model_fields(self, model_name):
+    def _orm_model_fields(self, model_name, member_rights=False, owner_uid=None):
+        self = self._orm_mode(member_rights, owner_uid)  # this read's mode, from the arguments
         self._orm_check_model(model_name)
         model = self._orm_base(model_name)
         if self._orm_member_rights():
@@ -890,7 +955,8 @@ class StydOdooBridgeOrm(models.AbstractModel):
         return out
 
     def _orm_search_read(self, model, domain=None, fields=None, limit=None, offset=None, order=None,
-                         tz=None, tz_mode=None, lang=None, company_ids=None):
+                         tz=None, tz_mode=None, lang=None, company_ids=None, member_rights=False, owner_uid=None):
+        self = self._orm_mode(member_rights, owner_uid)  # this read's mode, from the arguments
         self._orm_check_model(model)
         base = self._orm_base(model)
         if self._orm_member_rights():
@@ -900,6 +966,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
         self._orm_hr_require_named(model, fields)
         safe_fields = self._orm_validate_fields(meta, fields, model=model)
         valid_domain = self._orm_validate_domain(meta, domain, model=model)
+        timesheet = self._orm_check_timesheet(model, valid_domain, fields)
         valid_order = self._orm_validate_order(meta, order)
         safe_fields = self._orm_default_fields_without_pay(model, fields, safe_fields, valid_domain)
         self._orm_check_walls(model, valid_domain, self._orm_touched(safe_fields, valid_domain, valid_order))
@@ -910,7 +977,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
         valid_domain = self._orm_localize_domain(meta, valid_domain, resolved_tz)
 
         companies = self._orm_resolve_companies(company_ids)
-        final_domain = self._orm_company_domain(model, companies) + valid_domain
+        final_domain = self._orm_company_domain(model, companies, timesheet) + valid_domain
         scoped = self._orm_scoped(base, companies, resolved_tz, resolved_lang)
 
         records = scoped.search_read(
@@ -936,7 +1003,8 @@ class StydOdooBridgeOrm(models.AbstractModel):
         return result
 
     def _orm_read_group(self, model, domain=None, group_by=None, aggregates=None, limit=None, order=None,
-                        tz=None, tz_mode=None, lang=None, company_ids=None):
+                        tz=None, tz_mode=None, lang=None, company_ids=None, member_rights=False, owner_uid=None):
+        self = self._orm_mode(member_rights, owner_uid)  # this read's mode, from the arguments
         self._orm_check_model(model)
         base = self._orm_base(model)
         if self._orm_member_rights():
@@ -947,6 +1015,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
         valid_group_by = self._orm_validate_group_by(meta, group_by, model=model)
         agg_specs, agg_names = self._orm_validate_aggregates(meta, aggregates)
         valid_domain = self._orm_validate_domain(meta, domain, model=model)
+        timesheet = self._orm_check_timesheet(model, valid_domain, group_by or aggregates)
         resolved_limit = self._orm_resolve_limit(limit)
         valid_order = self._orm_validate_group_order(order, valid_group_by, agg_names)
         self._orm_check_walls(model, valid_domain, self._orm_touched(
@@ -956,7 +1025,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
         valid_domain = self._orm_localize_domain(meta, valid_domain, resolved_tz)
 
         companies = self._orm_resolve_companies(company_ids)
-        final_domain = self._orm_company_domain(model, companies) + valid_domain
+        final_domain = self._orm_company_domain(model, companies, timesheet) + valid_domain
         scoped = self._orm_scoped(base, companies, resolved_tz, resolved_lang)
 
         raw_groups = self._orm_run_read_group(
