@@ -19,13 +19,13 @@ class ResConfigSettings(models.TransientModel):
     )
 
     # The raw token is NEVER exposed in Settings. It is generated, rotated, and
-    # revoked from Speak To Your Database Bridge > Connection Setup and stored only as a hash.
+    # revoked from Speak To Your Database > Connection Setup and stored only as a hash.
     # Here we surface a read-only "configured" indicator only.
     styd_bridge_token_configured = fields.Boolean(
         string="Speak To Your Database Bridge Token Configured",
         compute="_compute_styd_bridge_token_configured",
         help="Whether a bridge token is configured. The token is generated and "
-             "rotated from Speak To Your Database Bridge > Connection Setup and is never shown here.",
+             "rotated from Speak To Your Database > Connection Setup and is never shown here.",
     )
 
     # Outbound channel (connect without opening a port).
@@ -48,8 +48,9 @@ class ResConfigSettings(models.TransientModel):
         string="Discuss assistant",
         config_parameter="styd_odoo_bridge.discuss_enabled",
         help="Users can ask Speak To Your Database questions in Discuss: in a direct "
-             "message to the bot, or by mentioning it in a channel. Answers use the asking "
-             "user's own Odoo access rights.",
+             "message to the bot, or by mentioning it in a channel. Answers are read with "
+             "the asking user's own Odoo access rights, once their Speak To Your Database "
+             "account is linked to that Odoo user.",
     )
     styd_discuss_audience = fields.Selection(
         selection=[

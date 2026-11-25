@@ -77,6 +77,8 @@ def run_pair_session(store, hub, row_id, code_hash, owner_uid, info, life_s=prot
         # Shown by STYD in its confirm card before the user clicks Connect.
         "db_name": info.get("db_name") or "",
         "company_name": info.get("company_name") or "",
+        # The address Odoo users open (web.base.url), or null: for links to records.
+        "public_url": info.get("public_url"),
     }
     session = None
     failures = 0
@@ -467,6 +469,7 @@ class StydOdooBridgeChannelWizard(models.TransientModel):
             "db_uuid": settings["db_uuid"],
             "db_name": self.env.cr.dbname,
             "company_name": owner.company_id.name or "",
+            "public_url": settings.get("public_url"),
         }
         dbname, row_id, code_hash = self.env.cr.dbname, row.id, proto.pair_code_hash(code)
         # Start only once the row is committed (the thread reads it).
