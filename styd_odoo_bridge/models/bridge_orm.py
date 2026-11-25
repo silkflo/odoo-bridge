@@ -117,6 +117,7 @@ ORM_MODEL_ALLOWLIST = frozenset({
     "pos.payment",
     "pos.payment.method",
     "report.pos.order",
+    "restaurant.table",  # restaurant floors (pos_restaurant)
     # Bank statements and reconciliation (ledger reader)
     "account.bank.statement",
     "account.bank.statement.line",
