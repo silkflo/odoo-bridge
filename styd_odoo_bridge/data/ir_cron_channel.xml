@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Watchdog: every minute, make sure ONE channel thread runs for this
+         database (a PostgreSQL advisory lock decides which process holds it).
+         It returns at once; a trigger at boot runs it within seconds. -->
+    <record id="ir_cron_styd_bridge_channel_keeper" model="ir.cron">
+        <field name="name">Speak To Your Database: keep the outbound channel alive</field>
+        <field name="model_id" ref="model_styd_odoo_bridge_channel"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_keeper()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>
