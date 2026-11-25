@@ -21,13 +21,13 @@
 
                         <setting
                             string="Speak To Your Database Bridge Token"
-                            help="The bridge token is generated and rotated from Speak To Your Database Bridge &gt; Connection Setup. It is stored only as a hash and is never shown here."
+                            help="The bridge token is generated and rotated from Speak To Your Database &gt; Connection Setup. It is stored only as a hash and is never shown here."
                             id="styd_bridge_token_setting"
                         >
                             <field name="styd_bridge_token_configured" widget="boolean_toggle" readonly="1"/>
                             <div class="text-muted">
                                 Generate, rotate, or revoke the token from
-                                <strong>Speak To Your Database Bridge &gt; Connection Setup</strong>.
+                                <strong>Speak To Your Database &gt; Connection Setup</strong>.
                             </div>
                         </setting>
 
@@ -61,7 +61,7 @@
                     <block title="Discuss assistant" name="styd_discuss_block">
                         <setting
                             string="Discuss assistant"
-                            help="Users ask Speak To Your Database in Discuss: a direct message to the bot, or a mention in a channel. Answers use the asking user's own Odoo access rights and need the outbound channel to be paired. Off by default."
+                            help="Users ask Speak To Your Database in Discuss: a direct message to the bot, or a mention in a channel. Answers are read with the asking user's own Odoo access rights, once their Speak To Your Database account is linked to that Odoo user. The assistant needs the outbound channel to be paired. Off by default."
                             id="styd_discuss_enabled_setting"
                         >
                             <field name="styd_discuss_enabled"/>

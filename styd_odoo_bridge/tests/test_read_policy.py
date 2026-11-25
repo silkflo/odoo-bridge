@@ -2,7 +2,7 @@
 on the Bridge: the wider model allowlist, the named many2many exceptions, a
 validated ``lang`` and an ordered ``company_ids`` (company first)."""
 
-from odoo import Command, release
+from odoo import Command
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 
@@ -11,10 +11,11 @@ from odoo.addons.styd_odoo_bridge.models.bridge_orm import StydOrmError
 
 from .channel_common import GROUPS
 
-# B0_AUDIT R2 (HR stays out: a separate owner decision; stock.production.lot is 15.0 only).
+# The models STYD reads on an API key (HR has its own list).
 R2_MODELS = (
     "pos.order", "pos.order.line", "pos.session", "pos.config", "pos.payment", "pos.payment.method",
-    "report.pos.order", "account.bank.statement", "account.bank.statement.line", "account.partial.reconcile",
+    "report.pos.order", "restaurant.table", "account.bank.statement", "account.bank.statement.line",
+    "account.partial.reconcile",
     "stock.valuation.layer", "account.analytic.line", "account.analytic.account", "account.analytic.plan",
     "project.task.type", "project.project.stage", "project.milestone", "project.update",
     "mrp.workcenter", "mrp.workcenter.productivity", "mrp.workcenter.productivity.loss",
@@ -22,7 +23,7 @@ R2_MODELS = (
 )
 STILL_REFUSED = (
     "hr.employee", "hr.contract", "hr.leave", "hr.attendance", "res.users", "ir.config_parameter",
-    "payment.transaction", "restaurant.table", "res.groups", "ir.attachment",
+    "payment.transaction", "res.groups", "ir.attachment", "stock.production.lot",
 )
 
 M2M = {"type": "many2many", "store": True}
@@ -57,10 +58,22 @@ class TestReadPolicy(TransactionCase):
         self.assertFalse([m for m in self.orm.MODEL_ALLOWLIST if m.startswith("hr.")])
 
     def test_r2_lots_of_this_version(self):
-        """Lots: stock.production.lot on Odoo 15 (what STYD reads there), stock.lot from 16."""
+        """Lots: stock.lot (Odoo 16 and later). Odoo 15's stock.production.lot is not read."""
         self.assertIn("stock.lot", self.orm.MODEL_ALLOWLIST)
-        if int(release.version_info[0]) == 15:
-            self.assertIn("stock.production.lot", self.orm.MODEL_ALLOWLIST)
+        self.assertNotIn("stock.production.lot", self.orm.MODEL_ALLOWLIST)
+        if "stock.production.lot" in self.env:
+            self.assertCode("model_not_allowed", self.orm._orm_check_model, "stock.production.lot")
+
+    def test_r2_restaurant_tables(self):
+        """restaurant.table (POS restaurant) is readable where pos_restaurant is installed."""
+        self.assertIn("restaurant.table", self.orm.MODEL_ALLOWLIST)
+        if "restaurant.table" not in self.env:
+            self.assertCode("model_not_installed", self.orm._orm_check_model, "restaurant.table")
+            return
+        self.orm._orm_check_model("restaurant.table")
+        out = self.orm._orm_search_read(model="restaurant.table", fields=["seats"], limit=5)
+        self.assertEqual(out["returned_count"], len(out["records"]))
+        self.assertIn("restaurant.table", [m["model"] for m in self.orm._orm_list_models()])
 
     def test_r2_currency_rates_read(self):
         """res.currency.rate is in base: a real read through the validators."""

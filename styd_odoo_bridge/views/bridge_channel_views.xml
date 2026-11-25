@@ -24,8 +24,9 @@
                         <h1>Connect without opening a port</h1>
                         <p class="text-muted">
                             Odoo opens a secure connection out to Speak To Your Database. You open no
-                            port, need no public address and change no firewall. Questions are answered
-                            as each member's own Odoo user, read-only.
+                            port, need no public address and change no firewall. Questions are read
+                            as each person's own Odoo user, once their Speak To Your Database account is
+                            linked to it. Read-only.
                         </p>
                     </div>
 
@@ -39,8 +40,8 @@
                         <p class="mb-0">
                             Open Speak To Your Database &#8594; Settings &#8594; Connections, choose
                             <strong>Connect without opening a port</strong> and type the code.
-                            It is shown only once and works once. Click <strong>Refresh</strong> to see
-                            the pairing appear below.
+                            It is shown only once and works once. Then click <strong>Refresh</strong> and
+                            approve the pairing below: nothing is read before you approve it.
                         </p>
                         <p class="mb-0 mt-2">
                             <strong>Never share this code</strong>, not in a screen share, a screenshot or a

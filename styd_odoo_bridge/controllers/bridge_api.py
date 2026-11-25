@@ -6,6 +6,7 @@ import logging
 from odoo import SUPERUSER_ID, api, http
 from odoo.http import request
 
+from odoo.addons.styd_odoo_bridge.models.bridge_service import DirectoryPageError
 from odoo.addons.styd_odoo_bridge.models.bridge_orm import (
     ORM_ACCESS_MODE,
     ORM_INTERNAL_CTX_KEYS,
@@ -292,7 +293,11 @@ class StydBridgeApi(http.Controller):
         service = self._get_service()
 
         try:
-            payload = service._build_user_directory_snapshot_payload()
+            payload = service._build_user_directory_snapshot_payload(
+                cursor=kwargs.get("cursor"), limit=kwargs.get("limit"))
+        except DirectoryPageError as exc:
+            self._audit_log(endpoint, "denied", exc.code, 400)
+            return self._error_response(exc.code, exc.message, status=400)
         except Exception as exc:
             self._audit_log(endpoint, "error", "user_directory_build_failed", 500, str(exc))
             return self._error_response(
