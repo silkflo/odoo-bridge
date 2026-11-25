@@ -16,6 +16,9 @@ from . import bridge_channel_protocol as proto
 
 _logger = logging.getLogger(__name__)
 
+# States the leader streams (a pairing waiting for approval refuses every request).
+STREAM_STATES = ("active", "waiting_approval")
+
 
 class StydOdooBridgePairing(models.Model):
     _name = "styd.odoo.bridge.pairing"
@@ -27,6 +30,7 @@ class StydOdooBridgePairing(models.Model):
     state = fields.Selection(
         selection=[
             ("pending", "Waiting for the code"),
+            ("waiting_approval", "Waiting for your approval"),
             ("active", "Paired"),
             ("revoked", "Unpaired"),
         ],
@@ -35,6 +39,16 @@ class StydOdooBridgePairing(models.Model):
         index=True,
     )
     workspace_label = fields.Char(readonly=True)
+    # Shown to the admin before they approve the pairing (sent by STYD in ``paired``).
+    workspace_ref = fields.Char(string="STYD workspace id", readonly=True, copy=False)
+    claimant_email_domain = fields.Char(readonly=True, copy=False,
+                                        help="Email domain of the STYD user who typed the code.")
+    approved_at = fields.Datetime(copy=False)
+    approved_uid = fields.Integer(copy=False)
+    # The database this pairing belongs to (recorded when the code is shown). A
+    # copy of the database (another uuid or creation date) never streams.
+    db_uuid = fields.Char(copy=False, readonly=True)
+    db_create_date = fields.Char(copy=False, readonly=True)
     owner_uid = fields.Integer(
         string="Connector owner uid",
         help="Odoo user id STYD sends for members not linked to an Odoo user, and the "
@@ -97,22 +111,60 @@ class StydOdooBridgePairing(models.Model):
         }
 
     @api.model
-    def _streamable_domain(self):
-        """Active pairings the leader streams: the hub confirmed the ack, or the ack
+    def _streamable_domain(self, states=STREAM_STATES):
+        """Pairings the leader streams: the hub confirmed the ack, or the ack
         went out long enough ago that a crash between storing and pair_done must
-        not leave the pairing unused (section 5.3)."""
+        not leave the pairing unused (section 5.3). A pairing waiting for the
+        admin's approval streams too: it answers every request with
+        ``pairing_not_approved``. Only pairings of THIS database (see
+        ``_current_database``)."""
         grace = fields.Datetime.now() - datetime.timedelta(seconds=60)
+        db = self._current_database()
         return [
-            ("state", "=", "active"),
+            ("state", "in", list(states)),
             ("pairing_id", "!=", False),
             ("secret", "!=", False),
+            ("db_uuid", "=", db["db_uuid"] or "-"),
+            ("db_create_date", "=", db["db_create_date"] or "-"),
             "|", ("ack_confirmed", "=", True), ("paired_at", "<", grace),
         ]
+
+    @api.model
+    def _approved_domain(self):
+        """Streamable pairings an admin approved: the only ones Discuss uses."""
+        return self._streamable_domain(states=("active",))
+
+    @api.model
+    def _current_database(self):
+        """This database's uuid and creation date, read from the table (not the
+        per-process parameter cache). Odoo gives a duplicated database new ones."""
+        self.env.cr.execute(
+            "SELECT key, value FROM ir_config_parameter WHERE key IN ('database.uuid', 'database.create_date')")
+        raw = dict(self.env.cr.fetchall())
+        return {"db_uuid": raw.get("database.uuid") or "", "db_create_date": raw.get("database.create_date") or ""}
+
+    def _database_matches(self, db=None):
+        self.ensure_one()
+        db = db or self._current_database()
+        return bool(self.db_uuid) and bool(self.db_create_date)             and self.db_uuid == db["db_uuid"] and self.db_create_date == db["db_create_date"]
+
+    @api.model
+    def _mark_copied(self):
+        """Pairings recorded for another database: never streamed; the wizard says
+        what to do. Returns them."""
+        db = self._current_database()
+        rows = self.search([("state", "in", list(STREAM_STATES))]).filtered(lambda p: not p._database_matches(db))
+        todo = rows.filtered(lambda p: p.status_code != "database_copied")
+        if todo:
+            todo.write({"status_code": "database_copied", "status_since": fields.Datetime.now()})
+            _logger.warning("STYD channel: %s pairing(s) belong to another database (copy); not connected", len(todo))
+        return rows
 
     def _revoke(self, reason):
         """Unpaired (either side): drop every secret, keep the row to show "pair again"."""
         self.write({
             "state": "revoked",
+            "approved_at": False,
             "secret": False,
             "pending_secret": False,
             "pending_rotation_id": False,

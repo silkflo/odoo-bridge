@@ -1,0 +1,152 @@
+{
+  "about": "Speak To Your Database's HR read list (API-key reads): the models, the fields each read may touch, and the company scope. The module mirrors it exactly; test_hardening checks it.",
+  "fields": {
+    "hr.employee.public": [
+      "id",
+      "name",
+      "active",
+      "department_id",
+      "job_id",
+      "job_title",
+      "parent_id",
+      "company_id",
+      "work_email",
+      "work_phone",
+      "user_id",
+      "tz"
+    ],
+    "hr.department": [
+      "id",
+      "name",
+      "complete_name",
+      "parent_id",
+      "manager_id",
+      "company_id",
+      "active"
+    ],
+    "hr.leave.report.calendar": [
+      "id",
+      "employee_id",
+      "department_id",
+      "company_id",
+      "state",
+      "duration",
+      "start_datetime",
+      "stop_datetime",
+      "request_date_from",
+      "request_date_to"
+    ],
+    "hr.leave": [
+      "id",
+      "employee_id",
+      "department_id",
+      "employee_company_id",
+      "user_id",
+      "request_date_from",
+      "request_date_to",
+      "date_from",
+      "date_to",
+      "number_of_days",
+      "number_of_hours",
+      "number_of_hours_display",
+      "state",
+      "holiday_status_id",
+      "work_entry_type_id"
+    ],
+    "hr.leave.type": [
+      "id",
+      "name",
+      "time_type",
+      "requires_allocation",
+      "unpaid",
+      "company_id",
+      "active"
+    ],
+    "hr.work.entry.type": [
+      "id",
+      "name",
+      "count_as",
+      "requires_allocation",
+      "unpaid",
+      "time_off_selectable",
+      "active"
+    ],
+    "hr.leave.allocation": [
+      "id",
+      "employee_id",
+      "employee_company_id",
+      "number_of_days",
+      "max_leaves",
+      "leaves_taken",
+      "date_from",
+      "date_to",
+      "state",
+      "holiday_status_id",
+      "work_entry_type_id",
+      "type_request_unit"
+    ],
+    "hr.attendance": [
+      "id",
+      "employee_id",
+      "check_in",
+      "check_out",
+      "worked_hours"
+    ],
+    "account.analytic.line": [
+      "id",
+      "employee_id",
+      "user_id",
+      "date",
+      "unit_amount",
+      "name",
+      "project_id",
+      "task_id",
+      "department_id",
+      "company_id",
+      "holiday_id"
+    ]
+  },
+  "company_scope": {
+    "hr.employee.public": {
+      "kind": "company",
+      "field": "company_id",
+      "allowEmpty": false
+    },
+    "hr.department": {
+      "kind": "company",
+      "field": "company_id",
+      "allowEmpty": true
+    },
+    "hr.leave.report.calendar": {
+      "kind": "company",
+      "field": "company_id",
+      "allowEmpty": false
+    },
+    "hr.leave": {
+      "kind": "company",
+      "field": "employee_company_id",
+      "allowEmpty": false
+    },
+    "hr.leave.allocation": {
+      "kind": "company",
+      "field": "employee_company_id",
+      "allowEmpty": false
+    },
+    "hr.leave.type": {
+      "kind": "company",
+      "field": "company_id",
+      "allowEmpty": true
+    },
+    "hr.work.entry.type": {
+      "kind": "configuration"
+    },
+    "hr.attendance": {
+      "kind": "employees",
+      "field": null
+    },
+    "account.analytic.line": {
+      "kind": "employees",
+      "field": "company_id"
+    }
+  }
+}

@@ -252,6 +252,7 @@ class PairingStore:
             env = self._env(cr)
             settings = read_settings(env, fresh=True)
             Pairing = env["styd.odoo.bridge.pairing"].sudo()
+            Pairing._mark_copied()  # a copy of the database never streams
             pairings = [p._snapshot() for p in Pairing.search(Pairing._streamable_domain())]
             return {"settings": settings, "pairings": pairings}
 
@@ -281,6 +282,16 @@ class PairingStore:
     def delete(self, row_id):
         with self.registry.cursor() as cr:
             self._env(cr)["styd.odoo.bridge.pairing"].sudo().browse(row_id).exists().unlink()
+
+    def notify_admins(self, row_id):
+        """Tell every Odoo administrator that a pairing waits for approval. Never raises."""
+        try:
+            with self.registry.cursor() as cr:
+                rec = self._env(cr)["styd.odoo.bridge.pairing"].sudo().browse(row_id).exists()
+                if rec:
+                    self._env(cr)["styd.odoo.bridge.channel.wizard"]._notify_waiting(rec)
+        except Exception:
+            _logger.warning("STYD channel: could not notify the administrators of a new pairing")
 
     def persist_seen(self, request_id, now_ms):
         try:
@@ -343,7 +354,7 @@ class PairingStream:
         changes them (rotation), and a snapshot read just before a rotation must
         not undo it. An unpair elsewhere makes the row unwanted: the leader stops us."""
         with self._plock:
-            for key in ("owner_uid", "workspace_label"):
+            for key in ("owner_uid", "workspace_label", "state"):
                 self.pairing[key] = snapshot.get(key)
 
     # -- lifecycle --------------------------------------------------------------
@@ -622,7 +633,12 @@ class PairingStream:
     def handle_discuss_answer(self, fields, args):
         """Store a verified answer for the Discuss job and wake it; never posts
         in Discuss from this thread. Tells the hub what became of it."""
-        code, question_id = discuss_deliver(self.runner.registry, self.pairing_id, fields["member_uid"], args)
+        if self.pairing.get("state") != "active":
+            qid = args.get("question_id") if isinstance(args, dict) else None
+            question_id = qid if isinstance(qid, str) and proto.QUESTION_ID_RE.match(qid) else None
+            code = "pairing_not_approved"
+        else:
+            code, question_id = discuss_deliver(self.runner.registry, self.pairing_id, fields["member_uid"], args)
         self.post_event({
             "t": "event", "kind": "discuss.delivered", "id": fields["id"],
             "question_id": question_id, "ok": code == "ok", "code": code,
@@ -835,7 +851,7 @@ class StydOdooBridgeChannel(models.AbstractModel):
                 executor_mod.icp_get(self.env["ir.config_parameter"].sudo(), executor_mod.ICP_ENABLED, "False")):
             return False
         Pairing = self.env["styd.odoo.bridge.pairing"].sudo()
-        return bool(Pairing.search_count([("state", "=", "active")]))
+        return bool(Pairing.search_count([("state", "in", ("active", "waiting_approval"))]))
 
     @api.model
     def _cron_keeper(self):

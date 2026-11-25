@@ -125,7 +125,8 @@ class TestChannelPairing(ChannelCase):
         t.join(15)
         self.assertEqual(box.get("outcome"), "paired")
         self.reload()
-        self.assertEqual(row.state, "active")
+        # Acked, then held until an Odoo admin approves it.
+        self.assertEqual(row.state, "waiting_approval")
         self.assertEqual(row.pairing_id, pairing_id)
         self.assertEqual(row.secret, secret)
         self.assertEqual(row.workspace_label, "Acme")
@@ -133,6 +134,10 @@ class TestChannelPairing(ChannelCase):
         self.assertFalse(row.pair_attempt)
         self.assertEqual(self.hub.pairings[pairing_id]["state"], "active", "the hub stored it after the ack")
         self.assertIn(row, self.Pairing.search(self.Pairing._streamable_domain()))
+        self.assertNotIn(row, self.Pairing.search(self.Pairing._approved_domain()))
+        self.Wizard.create({"approval_row_id": row.id}).action_approve()
+        self.assertEqual(row.state, "active")
+        self.assertIn(row, self.Pairing.search(self.Pairing._approved_domain()))
 
     def test_25_first_pair_call_names_the_database_and_company(self):
         """STYD's confirm card shows the database and the service user's company."""
