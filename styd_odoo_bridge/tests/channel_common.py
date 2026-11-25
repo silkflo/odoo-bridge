@@ -89,15 +89,21 @@ class ChannelCase(TransactionCase):
     # Odoo 20: a test cursor opened by a channel thread resets this test's cursor
     # while it is open, so a test reads its records (pairing ids) before the
     # threads start, never while they run.
-    def make_pairing(self, owner=None, label="Acme"):
+    def make_pairing(self, owner=None, label="Acme", state="active"):
+        """An approved pairing of THIS database (as the pair flow leaves it once an
+        admin approved it)."""
         pairing_id, secret = self.hub.add_pairing()
-        row = self.env["styd.odoo.bridge.pairing"].sudo().create({
+        Pairing = self.env["styd.odoo.bridge.pairing"].sudo()
+        db = Pairing._current_database()
+        row = Pairing.create({
             "pairing_id": pairing_id,
             "secret": secret,
-            "state": "active",
+            "state": state,
             "ack_confirmed": True,
             "owner_uid": (owner or self.admin).id,
             "workspace_label": label,
+            "db_uuid": db["db_uuid"],
+            "db_create_date": db["db_create_date"],
         })
         return row
 
