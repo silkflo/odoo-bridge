@@ -91,8 +91,9 @@
                                 <label for="styd_discuss_enabled"/>
                                 <div class="text-muted">
                                     Users ask Speak To Your Database in Discuss: a direct message to the bot, or a
-                                    mention in a channel. Answers use the asking user's own Odoo access rights and
-                                    need the outbound channel to be paired. Off by default.
+                                    mention in a channel. Answers are read with the asking user's own Odoo access
+                                    rights, once their Speak To Your Database account is linked to that Odoo user.
+                                    The assistant needs the outbound channel to be paired. Off by default.
                                 </div>
                             </div>
                         </div>

@@ -5,6 +5,8 @@ import logging
 from odoo import http
 from odoo.http import request
 
+from odoo.addons.styd_odoo_bridge.models.bridge_service import DirectoryPageError
+
 # Read-only ORM primitives ported from 17.0 so the STYD Data Guide can load
 # Odoo models on Odoo 16. The allowlist / field-filter / read-only guarantees
 # live in bridge_orm.py and are identical to 17.0.
@@ -175,8 +177,11 @@ class StydBridgeApi(http.Controller):
         service = self._get_service()
 
         try:
-            payload = service._build_user_directory_snapshot_payload()
+            payload = service._build_user_directory_snapshot_payload(
+                cursor=kwargs.get("cursor"), limit=kwargs.get("limit"))
             return self._json_response(payload, status=200)
+        except DirectoryPageError as exc:
+            return self._error_response(exc.code, exc.message, status=400)
         except Exception as exc:
             return self._error_response(
                 "user_directory_build_failed",

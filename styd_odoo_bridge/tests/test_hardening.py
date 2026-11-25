@@ -373,6 +373,15 @@ class TestSettingsGuard(HardeningCase):
             Settings.browse().get_values()
         with self.assertRaises(AccessError):
             Settings.browse().set_values()
+        # This module's own override, called directly: the settings of modules loaded
+        # after it (or Odoo's own) may refuse first and would hide a missing check.
+        own = next(cls for cls in type(Settings).__mro__
+                   if cls.__module__ == "odoo.addons.%s.models.res_config_settings" % MODULE)
+        refusal = "Only an Odoo administrator can manage the Speak To Your Database Bridge"
+        with self.assertRaisesRegex(AccessError, refusal):
+            own.get_values(Settings.browse())
+        with self.assertRaisesRegex(AccessError, refusal):
+            own.set_values(Settings.browse())
         self.assertEqual(self.icp.get_param("styd_odoo_bridge.enabled"), "True")
 
 

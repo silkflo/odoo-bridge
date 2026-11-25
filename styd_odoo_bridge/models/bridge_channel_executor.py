@@ -26,6 +26,7 @@ from odoo.exceptions import AccessError
 from odoo.modules.registry import Registry
 
 from . import bridge_channel_protocol as proto
+from .bridge_service import DirectoryPageError
 from .bridge_orm import ORM_HR_MODELS, ORM_MEMBER_ACCESS_MODE, ORM_TIMESHEET_MODEL, StydOrmError, _json_default
 
 _logger = logging.getLogger(__name__)
@@ -276,7 +277,11 @@ def _run_owner_op(su_env, op, args, owner_uid):
         if op == "security.snapshot":
             return 200, service._build_security_snapshot_payload(owner_uid=owner_uid), None, None
         if op == "users.directory":
-            payload = service._build_user_directory_snapshot_payload()
+            try:
+                payload = service._build_user_directory_snapshot_payload(
+                    cursor=args.get("cursor"), limit=args.get("limit"))
+            except DirectoryPageError as exc:
+                return _err(400, exc.code, exc.message) + (None, None)
             return 200, payload, len(payload.get("users") or []), None
         if op == "users.search":
             q = args.get("q")
