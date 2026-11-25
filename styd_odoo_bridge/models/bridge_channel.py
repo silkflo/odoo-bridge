@@ -43,6 +43,7 @@ KEEPER_CRON_XMLID = "styd_odoo_bridge.ir_cron_styd_bridge_channel_keeper"
 
 ICP_HUB_URL = "styd_odoo_bridge.channel_hub_url"
 ICP_CA_BUNDLE = "styd_odoo_bridge.channel_ca_bundle"
+ICP_BASE_URL = "web.base.url"
 DEFAULT_HUB_URL = "https://speaktoyourdatabase.com"
 LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
 
@@ -112,6 +113,7 @@ FRESH_PARAMS = (
     ICP_CA_BUNDLE,
     executor_mod.ICP_RATE,
     executor_mod.ICP_BURST,
+    ICP_BASE_URL,
 )
 
 
@@ -138,14 +140,18 @@ def read_settings(env, fresh=False):
         "rate": executor_mod.parse_limit(get(executor_mod.ICP_RATE), executor_mod.DEFAULT_RATE),
         "burst": executor_mod.parse_limit(get(executor_mod.ICP_BURST), executor_mod.DEFAULT_BURST),
         "db_uuid": executor_mod.icp_get(icp, "database.uuid", "") or "",
+        # The address Odoo users open, sent at pairing and in every hello.
+        "public_url": proto.clean_public_url(get(ICP_BASE_URL)),
     }
 
 
 def module_version():
+    """The add-on's own ``x.y.z``, from its manifest (Odoo 15 has no ``get_manifest``)."""
     try:
-        from odoo.modules.module import get_manifest
-        manifest = get_manifest(MODULE_NAME) or {}
-    except Exception:  # pragma: no cover - older helpers
+        from odoo.modules import module as odoo_module
+        reader = getattr(odoo_module, "get_manifest", None) or odoo_module.load_information_from_description_file
+        manifest = reader(MODULE_NAME) or {}
+    except Exception:  # pragma: no cover - a broken install
         manifest = {}
     return proto.module_version_from_manifest(manifest.get("version"))
 
@@ -423,6 +429,7 @@ class PairingStream:
             "module_version": info["module_version"],
             "odoo_series": info["odoo_series"],
             "db_uuid": info["db_uuid"],
+            "public_url": info.get("public_url"),
             "ops": list(proto.OPS),
             "features": list(proto.FEATURES),
             "instance": self.instance,
@@ -689,7 +696,8 @@ class ChannelRunner(threading.Thread):
         self.all_streams = []  # every stream this runner started (joined by the tests)
         self.hub = None
         self.executor = None
-        self.info = {"module_version": module_version(), "odoo_series": odoo_series(), "db_uuid": ""}
+        self.info = {"module_version": module_version(), "odoo_series": odoo_series(), "db_uuid": "",
+                     "public_url": None}
         self._hub_key = None
         self._last_gc = 0.0
 
@@ -769,6 +777,7 @@ class ChannelRunner(threading.Thread):
         if not loaded["pairings"]:
             return False
         self.info["db_uuid"] = settings["db_uuid"]
+        self.info["public_url"] = settings["public_url"]
         if self.executor is not None:
             self.executor.set_limits(settings["rate"], settings["burst"])
         hub_key = (settings["hub_url"], settings["ca_bundle"])

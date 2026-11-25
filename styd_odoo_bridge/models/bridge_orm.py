@@ -77,7 +77,6 @@ ORM_MODEL_ALLOWLIST = frozenset({
     "stock.warehouse",
     "stock.warehouse.orderpoint",
     "stock.lot",
-    "stock.production.lot",  # Odoo 15's lots (stock.lot from 16.0); STYD reads it on 15
 
     # Purchase
     "purchase.order",
@@ -118,6 +117,7 @@ ORM_MODEL_ALLOWLIST = frozenset({
     "pos.payment",
     "pos.payment.method",
     "report.pos.order",
+    "restaurant.table",  # restaurant floors (pos_restaurant)
     # Bank statements and reconciliation (ledger reader)
     "account.bank.statement",
     "account.bank.statement.line",

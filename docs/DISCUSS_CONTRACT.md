@@ -253,7 +253,7 @@ All answered by the bot in the asker's language, **free** (no call to STYD, no p
 |---|---|
 | The assistant is switched off (the default) | "The … assistant is switched off in this Odoo. Ask your Odoo administrator." |
 | The user may not ask: not in the admin's audience (all internal users / a group / chosen users), portal or public, `__system__`, or outside the STYD group when "Only members of the STYD group" is on | "You can't ask Speak To Your Database in Odoo yet. Please ask your Odoo administrator for access." |
-| No usable pairing (Bridge off, not paired, several workspaces and none chosen) | "This Odoo is not connected to Speak To Your Database right now…" |
+| No usable pairing (Bridge off, not paired, pairing waiting for an administrator's approval (§11), several workspaces and none chosen) | "This Odoo is not connected to Speak To Your Database right now…" |
 | Only a mention, no question | A one-line example question |
 | Rate limits: 3 per user per minute, 30 per user per hour, 300 per database per hour (the hourly ones set by the admin) | "You have asked many questions…" / "This Odoo has reached its limit…" |
 
@@ -305,3 +305,33 @@ in the chat that opens for the answer.
 4. Logs: ids, codes and timings only; never the question, the answer or table values.
 5. A loopback test route or script that plays STYD against a real module (the module's own fake hub in
    `styd_odoo_bridge/tests/fake_hub.py` follows this contract and can serve as the reference).
+
+## 11. Pairing approval, and copies of the database [M]
+
+**Approval.** Typing the code in STYD does not open the connection by itself. Once the hub has sent `paired`
+and the module has acknowledged it (proof of possession), the module keeps the pairing **waiting for an
+administrator's approval**:
+
+- Every Odoo administrator (Settings) gets one line from the assistant: the STYD workspace's name and id, the
+  e-mail domain of the person who typed the code, and where to decide (Speak To Your Database > Connect
+  without opening a port).
+- Until an administrator clicks **Approve** there, every request is answered
+  `{"t":"result","ok":false,"error":{"code":"pairing_not_approved"}}`, and the assistant uses no such pairing:
+  no question is sent, and a `discuss_answer` for it is not posted (`discuss.delivered` code
+  `pairing_not_approved`).
+- **Refuse** unpairs it, like **Unpair** (the signed unpair event, then every secret is cleared).
+- STYD reads `pairing_not_approved` as "waiting for the Odoo administrator": never as a failed connection
+  or a refused key. Reads work as soon as the pairing is approved; nothing else changes.
+
+**Copies of the database.** A pairing belongs to the database that showed the code: the module records its
+`database.uuid` and `database.create_date`. A copy made with Odoo's own tools (Duplicate, or a restore
+marked as a copy) gets a new uuid and creation date, so its pairings never connect: the wizard says "This
+database is a copy of the paired one", and the executor answers `not_paired`. On Odoo 16 and later,
+neutralizing a database also unpairs every pairing and clears its secrets.
+
+**Unpair before copying a database.** A copy made any other way (`pg_dump` and restore, a disk or virtual
+machine snapshot, a database restored "as moved") keeps the uuid and the creation date, so neither the module
+nor STYD can tell it from the original: both would connect as the same pairing. Before making such a copy,
+unpair the database in Speak To Your Database > Connect without opening a port, make the copy, then show a
+new code in the original and pair it again (and approve it). Pair the copy only if it should answer STYD on
+its own, with its own code.

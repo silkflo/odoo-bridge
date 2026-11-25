@@ -22,6 +22,7 @@ import json
 import re
 import secrets
 import threading
+import urllib.parse
 from collections import OrderedDict
 
 PROTOCOL_VERSIONS = (1,)
@@ -66,6 +67,9 @@ ROTATION_GRACE_MS = 120_000
 PAIR_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 PAIR_CODE_LENGTH = 8
 PAIR_CODE_LIFE_S = 900
+
+# The public address sent in the first pair message and in every hello (``public_url``).
+PUBLIC_URL_MAX = 2048
 
 UP_PATHS = ("/bridge/v1/poll", "/bridge/v1/result", "/bridge/v1/event")
 UP_HEADERS = {
@@ -246,6 +250,28 @@ def rotate_proof(new_secret, pairing_id, rotation_id):
     if key is None:
         raise ValueError("bad secret")
     return _hmac_hex(key, "styd-bridge-rotated-v1\n%s\n%s" % (pairing_id, rotation_id))
+
+
+def clean_public_url(value):
+    """The address Odoo users open (``web.base.url``) as the module sends it: an
+    absolute http(s) URL with no credentials, query or fragment, and no trailing
+    slash. None when the value is not such an address."""
+    if not isinstance(value, str):
+        return None
+    url = value.strip()
+    if not url or len(url) > PUBLIC_URL_MAX or any(ord(ch) <= 32 or ord(ch) == 127 for ch in url):
+        return None
+    try:
+        parts = urllib.parse.urlsplit(url)
+        host = parts.hostname
+        parts.port  # noqa: B018 - raises ValueError on a malformed port
+    except ValueError:
+        return None
+    if parts.scheme.lower() not in ("http", "https") or not host:
+        return None
+    if parts.username is not None or parts.password is not None or parts.query or parts.fragment:
+        return None
+    return "%s://%s%s" % (parts.scheme.lower(), parts.netloc, parts.path.rstrip("/"))
 
 
 # ---------------------------------------------------------------------------
