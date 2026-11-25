@@ -17,6 +17,9 @@
                 <sheet>
                     <field name="has_pair_code" invisible="1"/>
                     <field name="bridge_enabled" invisible="1"/>
+                    <field name="has_approval" invisible="1"/>
+                    <field name="owner_is_admin" invisible="1"/>
+                    <field name="approval_row_id" invisible="1" force_save="1"/>
                     <div class="oe_title">
                         <h1>Connect without opening a port</h1>
                         <p class="text-muted">
@@ -39,11 +42,37 @@
                             It is shown only once and works once. Click <strong>Refresh</strong> to see
                             the pairing appear below.
                         </p>
+                        <p class="mb-0 mt-2">
+                            <strong>Never share this code</strong>, not in a screen share, a screenshot or a
+                            support ticket: whoever types it first connects their workspace to this Odoo.
+                            Speak To Your Database will never ask you for it.
+                        </p>
+                    </div>
+
+                    <div class="alert alert-warning" role="alert" invisible="not has_approval">
+                        <h3 class="mb-1">A pairing is waiting for your approval</h3>
+                        <p>
+                            STYD reads nothing until you approve. Approve only if you typed the code yourself
+                            in this workspace; otherwise refuse.
+                        </p>
+                        <field name="approval_html" nolabel="1" readonly="1"/>
+                        <div class="mt-2">
+                            <button name="action_approve" type="object" string="Approve"
+                                    class="btn-primary me-2"/>
+                            <button name="action_refuse" type="object" string="Refuse"
+                                    class="btn-danger"
+                                    confirm="Refusing unpairs this STYD workspace. Continue?"/>
+                        </div>
                     </div>
 
                     <group string="Pairing">
                         <field name="owner_user_id" options="{'no_create': True}"/>
                     </group>
+                    <div class="alert alert-info" role="alert" invisible="not owner_is_admin">
+                        The connector owner is an Odoo administrator. STYD reads as this user for members who
+                        are not linked to an Odoo user, so we suggest a dedicated Odoo user for Speak To Your
+                        Database, with only the access it needs.
+                    </div>
 
                     <separator string="Pairings"/>
                     <field name="pairings_html" nolabel="1" readonly="1"/>

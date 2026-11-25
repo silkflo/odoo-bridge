@@ -35,6 +35,7 @@ import time
 import requests
 
 from odoo import SUPERUSER_ID, api, fields, models
+from odoo.exceptions import AccessError
 from odoo.modules import module as odoo_module
 
 from . import bridge_channel as channel_mod
@@ -60,6 +61,12 @@ AUDIENCES = ("all", "group", "users")
 DEFAULT_RATE_USER_HOUR = 30
 DEFAULT_RATE_DB_HOUR = 300
 BURST_USER_PER_MINUTE = 3
+# The bot's free lines ("ask your admin", "switched off", rate limits): at most
+# one per user per minute, each leaving one "blocked" row.
+FREE_LINE_PERIOD_S = 60
+# Set by the module itself (with sudo) when it posts as the bot: any other post
+# with the bot as author is refused.
+BOT_POST_CTX = "styd_discuss_bot_post"
 
 ANSWER_TIMEOUT_S = 180
 SEND_ATTEMPTS = 3
@@ -216,7 +223,7 @@ class StydDiscussQuestion(models.Model):
         if not settings["bridge_enabled"]:
             return None
         Pairing = self.env["styd.odoo.bridge.pairing"].sudo()
-        pairings = Pairing.search(Pairing._streamable_domain())
+        pairings = Pairing.search(Pairing._approved_domain())
         if settings["pairing_ref"]:
             pairings = pairings.filtered(lambda p: p.pairing_id == settings["pairing_ref"])
         return pairings if len(pairings) == 1 else None
@@ -248,14 +255,6 @@ class StydDiscussQuestion(models.Model):
         # chat with a colleague) is read by others too.
         own_chat = channel.channel_type == "chat" and bot in member_partners(channel)
 
-        def reply(key):
-            # Free lines say nothing private: posted where the user asked (as a reply
-            # to the question when others read that conversation).
-            self._post_bot(channel, text_mod.bot_line(key, lang), parent=None if own_chat else message)
-
-        if not settings["enabled"]:
-            reply("disabled")
-            return None
         base = {
             "question_id": proto.new_question_id(),
             "user_id": user.id,
@@ -264,8 +263,20 @@ class StydDiscussQuestion(models.Model):
             "lang": lang,
             "tz": user.tz or "UTC",
         }
+
+        def reply(key):
+            # Free lines say nothing private: posted where the user asked (as a reply
+            # to the question when others read that conversation). At most one per
+            # user per minute, so a user cannot make the bot post without end.
+            if self._free_line_recent(user):
+                return
+            self.create(dict(base, state="blocked", outcome_code=key, finished_at=fields.Datetime.now()))
+            self._post_bot(channel, text_mod.bot_line(key, lang), parent=None if own_chat else message)
+
+        if not settings["enabled"]:
+            reply("disabled")
+            return None
         if not self._may_ask(user, settings):
-            self.create(dict(base, state="blocked", outcome_code="not_allowed", finished_at=fields.Datetime.now()))
             reply("not_allowed")
             return None
         text, truncated = text_mod.extract_question(message.body, bot.id, bot.name)
@@ -278,7 +289,6 @@ class StydDiscussQuestion(models.Model):
             return None
         limited = self._rate_limit_key(user, settings)
         if limited:
-            self.create(dict(base, state="blocked", outcome_code=limited, finished_at=fields.Datetime.now()))
             reply(limited)
             return None
         answer_channel, origin = channel, False
@@ -301,6 +311,12 @@ class StydDiscussQuestion(models.Model):
         return question
 
     @api.model
+    def _free_line_recent(self, user):
+        since = fields.Datetime.now() - datetime.timedelta(seconds=FREE_LINE_PERIOD_S)
+        return bool(self.search_count([("user_id", "=", user.id), ("state", "=", "blocked"),
+                                       ("create_date", ">=", since)]))
+
+    @api.model
     def _trigger(self, at=None):
         cron = self.env.ref(CRON_XMLID, raise_if_not_found=False)
         if cron:
@@ -313,7 +329,7 @@ class StydDiscussQuestion(models.Model):
         notified beyond the conversation."""
         bot = self._bot()
         values = {"parent_id": parent.id} if parent else {}
-        return channel.sudo().message_post(
+        return channel.sudo().with_context(**{BOT_POST_CTX: True}).message_post(
             body=body, author_id=bot.id, message_type="comment", subtype_xmlid="mail.mt_comment", **values)
 
     def _say(self, key):
@@ -390,7 +406,7 @@ class StydDiscussQuestion(models.Model):
     def _send(self, settings):
         self.ensure_one()
         Pairing = self.env["styd.odoo.bridge.pairing"].sudo()
-        pairing = Pairing.search([("pairing_id", "=", self.pairing_ref)] + Pairing._streamable_domain(), limit=1)
+        pairing = Pairing.search([("pairing_id", "=", self.pairing_ref)] + Pairing._approved_domain(), limit=1)
         if not settings["enabled"] or not pairing:
             self._finish("failed", "not_connected", "not_connected")
             return
@@ -469,7 +485,7 @@ class StydDiscussQuestion(models.Model):
                     if secrets is None:
                         secrets = self._known_secrets()
                     body = text_mod.render_answer(answer, question.lang, secrets)
-                    question._post_bot(question.channel_id, body)
+                    question._post_bot(question._answer_channel(), body)
                     question._finish("done", answer.get("status") or "answered")
                 except Exception:
                     _logger.exception("STYD discuss: could not post an answer")
@@ -477,6 +493,37 @@ class StydDiscussQuestion(models.Model):
             item.unlink()
             if commit:
                 self.env.cr.commit()
+
+    def _answer_channel(self):
+        """Where the answer is posted, decided now (members can change while STYD
+        answers): the conversation, unless anyone in it is not an internal user
+        (a portal user, a guest, a contact): then the asker's own chat with the
+        bot, and one line where they asked."""
+        self.ensure_one()
+        channel = self.channel_id
+        if not self._has_external_members(channel):
+            return channel
+        chat = self._user_chat(self.user_id)
+        values = {"channel_id": chat.id}
+        if not self.origin_channel_id:
+            values["origin_channel_id"] = channel.id
+        self.write(values)
+        return chat
+
+    @api.model
+    def _has_external_members(self, channel):
+        bot = self._bot()
+        for line in channel.sudo()[members_field(channel)]:
+            if "guest_id" in line._fields and line.guest_id:
+                return True
+            partner = line.partner_id
+            if not partner or partner == bot:
+                continue
+            users = partner.with_context(active_test=False).user_ids
+            # OdooBot (__system__) joins channels created by the system: not a reader.
+            if not users.filtered(lambda u: (u.active or u.id == SUPERUSER_ID) and not u.share):
+                return True
+        return False
 
     @api.model
     def _process_timeouts(self, commit=False):
@@ -493,6 +540,16 @@ class StydDiscussQuestion(models.Model):
     def _user_chat(self, user):
         """The user's direct chat with the bot, opened if needed. The welcome line
         is posted once per user ever, and only while the assistant is on."""
+        chat = self._bot_chat(user)
+        Welcome = self.env["styd.discuss.welcome"].sudo()
+        if self._settings()["enabled"] and not Welcome.search_count([("user_id", "=", user.id)]):
+            Welcome.create({"user_id": user.id})
+            self._post_bot(chat, text_mod.bot_line("welcome", user.lang))
+        return chat
+
+    @api.model
+    def _bot_chat(self, user):
+        """The user's direct chat with the bot, opened if needed (no welcome line)."""
         bot = self._bot()
         Channel = self.env["discuss.channel"].sudo()
         chat = Channel.search([
@@ -502,10 +559,6 @@ class StydDiscussQuestion(models.Model):
         ], limit=1)
         if not chat:
             chat = open_chat(Channel.with_user(user).sudo(), [bot.id])
-        Welcome = self.env["styd.discuss.welcome"].sudo()
-        if self._settings()["enabled"] and not Welcome.search_count([("user_id", "=", user.id)]):
-            Welcome.create({"user_id": user.id})
-            self._post_bot(chat, text_mod.bot_line("welcome", user.lang))
         return chat
 
     @api.model
@@ -585,6 +638,9 @@ class StydDiscussInbox(models.Model):
             return "late"
         if self.search_count([("question_ref", "=", question.question_id)]):
             return "duplicate"
+        Pairing = self.env["styd.odoo.bridge.pairing"].sudo()
+        if not Pairing.search_count([("pairing_id", "=", pairing_id)] + Pairing._approved_domain()):
+            return "pairing_not_approved"
         self.create({"question_ref": question.question_id, "member_uid": member_uid,
                      "payload": json.dumps(answer)})
         Question._trigger()
@@ -608,6 +664,17 @@ class DiscussChannel(models.Model):
         if bot and bot.id in (partner_ids or []) and bot.id not in allowed:
             allowed = list(allowed) + [bot.id]
         return allowed
+
+    def message_post(self, **kwargs):
+        """Only the module posts as the bot: a post naming the bot as its author is
+        refused unless the module made it (its flag, with sudo)."""
+        author_id = kwargs.get("author_id")
+        author_id = getattr(author_id, "id", author_id)
+        if author_id:
+            bot = self.env["styd.discuss.question"].sudo()._bot()
+            if bot and author_id == bot.id and not (self.env.su and self.env.context.get(BOT_POST_CTX)):
+                raise AccessError("Only Speak To Your Database posts as its assistant.")
+        return super().message_post(**kwargs)
 
     def _message_post_after_hook(self, message, *args, **kwargs):
         # Odoo 15 to 19 pass the message's values; 20 passes the message only.

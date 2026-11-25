@@ -235,4 +235,8 @@ class TestReadPolicyApps(TransactionCase):
         for model in ("account.partial.reconcile", "account.bank.statement", "account.bank.statement.line",
                       "account.analytic.line", "account.analytic.account", "account.analytic.plan"):
             if model in self.env:
-                self.assertIsInstance(self.orm._orm_search_read(model=model, limit=1)["records"], list, model)
+                # Analytic lines: journal-item lines only (timesheet lines follow the HR rules).
+                domain = [[self.orm._orm_journal_item_field(model), "!=", False]] \
+                    if model == "account.analytic.line" else None
+                self.assertIsInstance(self.orm._orm_search_read(model=model, limit=1, domain=domain)["records"],
+                                      list, model)
