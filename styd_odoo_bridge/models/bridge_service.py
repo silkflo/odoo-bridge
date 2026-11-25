@@ -1,10 +1,25 @@
 import hashlib
+import re
 from datetime import datetime, timezone
 
 from odoo import models, release
 
 from . import bridge_tz
 from .bridge_orm import model_has_access
+
+
+class DirectoryPageError(ValueError):
+    """A ``cursor`` or ``limit`` the user directory cannot use (answered 400)."""
+
+    def __init__(self, code, message):
+        super().__init__(code)
+        self.code = code
+        self.message = message
+
+
+DIRECTORY_CURSOR_RE = re.compile(r"^[0-9]{1,18}$")
+DIRECTORY_LIMIT_RE = re.compile(r"^[0-9]{1,6}$")
+LIKE_SPECIAL_RE = re.compile(r"([\\%_])")
 
 
 class StydOdooBridgeService(models.AbstractModel):
@@ -431,7 +446,15 @@ class StydOdooBridgeService(models.AbstractModel):
             "odoo_user_directory_v1",
             "odoo_capability_snapshot_v1",
             "tz_aware_v1",
+            "odoo_user_directory_paging_v1",
         ]
+
+    def _get_module_version(self):
+        """This add-on's own version, ``x.y.z`` from its manifest (the same value as
+        the channel hello's ``module_version``). ``bridge_version`` is the version of
+        the HTTP payloads and does not change with the add-on."""
+        from .bridge_channel import module_version
+        return module_version()
 
     def _get_group_xmlid_map(self, groups):
         xmlid_map = {}
@@ -905,13 +928,39 @@ class StydOdooBridgeService(models.AbstractModel):
             "multi_company": len(company_scope.get("allowed_company_ids", [])) > 1,
         }
 
-    def _build_user_directory_payload(self):
-        users = self.env["res.users"].sudo().search(
-            [("active", "=", True)],
-            limit=self.USER_DIRECTORY_LIMIT,
-            order="name asc",
-        )
+    def _directory_after_id(self, cursor):
+        """The user id a directory page starts after (0: the first page)."""
+        if cursor is None or cursor == "":
+            return 0
+        if not isinstance(cursor, str) or not DIRECTORY_CURSOR_RE.match(cursor):
+            raise DirectoryPageError("invalid_cursor", "cursor must be the next_cursor of the previous page.")
+        return int(cursor)
 
+    def _directory_page_size(self, limit):
+        """Users per page: USER_DIRECTORY_LIMIT by default, and at most."""
+        if limit is None or limit == "":
+            return self.USER_DIRECTORY_LIMIT
+        if isinstance(limit, str) and DIRECTORY_LIMIT_RE.match(limit):
+            limit = int(limit)
+        if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
+            raise DirectoryPageError("invalid_limit", "limit must be a whole number, 1 or more.")
+        return min(limit, self.USER_DIRECTORY_LIMIT)
+
+    def _build_user_directory_page(self, cursor=None, limit=None):
+        """One page of the active users, in id order: ``(users, next_cursor)``.
+        ``next_cursor`` is None on the last page; any other value is passed back
+        as ``cursor`` to read the next page."""
+        after_id = self._directory_after_id(cursor)
+        size = self._directory_page_size(limit)
+        users = self.env["res.users"].sudo().search(
+            [("active", "=", True), ("id", ">", after_id)], limit=size + 1, order="id asc")
+        next_cursor = str(users[size - 1].id) if len(users) > size else None
+        return self._build_directory_users(users[:size]), next_cursor
+
+    def _build_user_directory_payload(self, cursor=None, limit=None):
+        return self._build_user_directory_page(cursor=cursor, limit=limit)[0]
+
+    def _build_directory_users(self, users):
         payload = []
         for user in users:
             partner = user.partner_id.sudo() if user.partner_id else None
@@ -938,6 +987,7 @@ class StydOdooBridgeService(models.AbstractModel):
         return {
             "ok": True,
             "bridge_version": self.BRIDGE_VERSION,
+            "module_version": self._get_module_version(),
             "odoo_version": self._get_odoo_version(),
             "odoo_series": self._get_odoo_series(),
             "edition": self._get_edition(),
@@ -955,6 +1005,7 @@ class StydOdooBridgeService(models.AbstractModel):
 
         payload = {
             "bridge_version": self.BRIDGE_VERSION,
+            "module_version": self._get_module_version(),
             "snapshot_version": 1,
             "generated_at_utc": self._utc_now_iso(),
             "instance": {
@@ -973,34 +1024,39 @@ class StydOdooBridgeService(models.AbstractModel):
 
         return payload
 
-    def _build_user_directory_snapshot_payload(self):
+    def _build_user_directory_snapshot_payload(self, cursor=None, limit=None):
+        """/users/directory body: one page of active users (``next_cursor`` null on
+        the last page). Without ``cursor``, the first page."""
+        users, next_cursor = self._build_user_directory_page(cursor=cursor, limit=limit)
         return {
             "bridge_version": self.BRIDGE_VERSION,
             "snapshot_version": 1,
             "generated_at_utc": self._utc_now_iso(),
-            "users": self._build_user_directory_payload(),
+            "users": users,
+            "next_cursor": next_cursor,
         }
 
     def _build_user_search_payload(self, query):
-        """/users/search body: the directory filtered on login, name or email."""
-        directory = self._build_user_directory_snapshot_payload()
-        users = directory.get("users", [])
-
-        q = str(query or "").strip().lower()
+        """/users/search body: active users whose login, name or email contains
+        the query (any case), searched among all users, at most
+        USER_DIRECTORY_LIMIT of them in id order (``truncated`` when more match)."""
+        q = str(query or "").strip()
+        domain = [("active", "=", True)]
         if q:
-            users = [
-                user for user in users
-                if q in str(user.get("login") or "").lower()
-                or q in str(user.get("name") or "").lower()
-                or q in str(user.get("email") or "").lower()
-            ]
+            pattern = "%" + LIKE_SPECIAL_RE.sub(r"\\\1", q) + "%"
+            domain += ["|", "|", ("login", "=ilike", pattern), ("name", "=ilike", pattern),
+                       ("email", "=ilike", pattern)]
+        found = self.env["res.users"].sudo().search(
+            domain, limit=self.USER_DIRECTORY_LIMIT + 1, order="id asc")
+        users = self._build_directory_users(found[:self.USER_DIRECTORY_LIMIT])
 
         return {
-            "bridge_version": directory.get("bridge_version"),
-            "snapshot_version": directory.get("snapshot_version"),
-            "generated_at_utc": directory.get("generated_at_utc"),
+            "bridge_version": self.BRIDGE_VERSION,
+            "snapshot_version": 1,
+            "generated_at_utc": self._utc_now_iso(),
             "query": query or "",
             "count": len(users),
+            "truncated": len(found) > self.USER_DIRECTORY_LIMIT,
             "users": users,
         }
 

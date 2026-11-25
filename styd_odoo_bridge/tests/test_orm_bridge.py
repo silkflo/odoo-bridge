@@ -343,7 +343,7 @@ class TestStydOrmBridge(TransactionCase):
             "maintenance.equipment", "maintenance.request", "maintenance.team",
             # M-R2 (B0_AUDIT): what STYD reads on an API key
             "pos.order", "pos.order.line", "pos.session", "pos.config", "pos.payment",
-            "pos.payment.method", "report.pos.order",
+            "pos.payment.method", "report.pos.order", "restaurant.table",
             "account.bank.statement", "account.bank.statement.line", "account.partial.reconcile",
             "account.analytic.line", "account.analytic.account", "account.analytic.plan",
             "stock.valuation.layer", "mrp.workcenter", "mrp.workcenter.productivity",
