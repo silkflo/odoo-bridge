@@ -91,7 +91,8 @@ class TestDiscussAsk(DiscussCase):
         self.assertFalse(self.Question._settings()["enabled"], "the assistant is off until an admin turns it on")
         chat = self.dm(self.asker)
         self.ask(self.asker, chat, "Ventes du mois ?")
-        self.assertFalse(self.Question.search([("channel_id", "=", chat.id)]))
+        # Only the free line's "blocked" row: no question for STYD.
+        self.assertFalse(self.Question.search([("channel_id", "=", chat.id), ("state", "!=", "blocked")]))
         self.assertIn(text_mod.say("disabled", "fr_FR"), self.bot_texts(chat)[-1])
         self.run_job()
         self.assertFalse(self.hub.discuss_asks, "nothing goes to STYD")
@@ -244,7 +245,7 @@ class TestDiscussAsk(DiscussCase):
         room = self.env["mail.channel"].sudo().create({"name": "STYD room", "channel_type": "channel"})
         self.join(room, self.asker.partner_id)
         self.ask(self.asker, room, "", mention=True)
-        self.assertFalse(self.Question.search([("channel_id", "=", room.id)]))
+        self.assertFalse(self.Question.search([("channel_id", "=", room.id), ("state", "!=", "blocked")]))
         self.assertIn(str(text_mod.say("empty", "fr_FR")[:20]), self.bot_texts(room)[-1])
 
 
@@ -445,7 +446,7 @@ class TestDiscussRules(DiscussCase):
         self.row.sudo()._revoke("admin")
         self.ask(self.asker, chat, "Ventes ?")
         self.assertIn(text_mod.say("not_connected", "fr_FR"), self.bot_texts(chat)[-1])
-        self.assertFalse(self.Question.search([("channel_id", "=", chat.id)]))
+        self.assertFalse(self.Question.search([("channel_id", "=", chat.id), ("state", "!=", "blocked")]))
 
     def test_25_crafted_text_is_data_and_the_bot_cannot_write(self):
         partners_before = self.env["res.partner"].sudo().search_count([])

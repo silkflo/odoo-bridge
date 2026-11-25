@@ -26,7 +26,7 @@ from odoo.exceptions import AccessError
 from odoo.modules.registry import Registry
 
 from . import bridge_channel_protocol as proto
-from .bridge_orm import ORM_HR_MODELS, ORM_MEMBER_ACCESS_MODE, ORM_MEMBER_RIGHTS_CTX, StydOrmError, _json_default
+from .bridge_orm import ORM_HR_MODELS, ORM_MEMBER_ACCESS_MODE, ORM_TIMESHEET_MODEL, StydOrmError, _json_default
 
 _logger = logging.getLogger(__name__)
 
@@ -195,6 +195,24 @@ def readonly_cursor(registry, statement_ms):
 
 
 # ---------------------------------------------------------------------------
+# the pairing must be approved by an Odoo admin, and be this database's
+# ---------------------------------------------------------------------------
+def check_pairing_approved(su_env, pairing_id):
+    """Read the pairing row itself (not the stream's copy): a pairing an admin has
+    not approved yet answers every request with ``pairing_not_approved``."""
+    Pairing = su_env["styd.odoo.bridge.pairing"].sudo()
+    row = Pairing.search([("pairing_id", "=", pairing_id or "-")], limit=1)
+    if not row or row.state == "waiting_approval":
+        raise proto.ChannelError("pairing_not_approved",
+                                 "An Odoo administrator has not approved this pairing yet.")
+    if row.state != "active":
+        raise proto.ChannelError("not_paired", "This pairing is not active.")
+    if not row._database_matches():
+        # A copy of the paired database (the leader does not stream it either).
+        raise proto.ChannelError("not_paired", "This pairing belongs to another database.")
+
+
+# ---------------------------------------------------------------------------
 # who may be asked as (section 7)
 # ---------------------------------------------------------------------------
 def check_member(su_env, member_uid, op, owner_uid):
@@ -216,14 +234,14 @@ def check_member(su_env, member_uid, op, owner_uid):
     return user
 
 
-def member_context(user, owner_uid):
+def member_context(user):
+    """The member's own companies, lang and tz. Member rights and the owner are
+    explicit arguments of the ORM entry points, never context keys from here."""
     companies = [user.company_id.id] + [c for c in user.company_ids.ids if c != user.company_id.id]
     return {
         "allowed_company_ids": companies,
         "lang": user.lang or "en_US",
         "tz": user.tz or "UTC",
-        ORM_MEMBER_RIGHTS_CTX: True,
-        "styd_bridge_connector_owner_uid": owner_uid,
     }
 
 
@@ -237,50 +255,52 @@ def _err(status, code, detail=None):
     return status, body
 
 
+# Owner-only ops answer a fixed message when they fail: an exception's text can
+# carry internal details, so it is logged by type only.
+OWNER_OP_FAILURES = {
+    "health": ("health_build_failed", "The health payload could not be built."),
+    "security.snapshot": ("snapshot_build_failed", "The security snapshot could not be built."),
+    "users.directory": ("user_directory_build_failed", "The user directory could not be built."),
+    "users.search": ("user_search_failed", "The user search failed."),
+    "capabilities": ("capability_snapshot_build_failed", "The capability snapshot could not be built."),
+}
+
+
 def _run_owner_op(su_env, op, args, owner_uid):
-    service = su_env["styd.odoo.bridge.service"].with_context(styd_bridge_connector_owner_uid=owner_uid).sudo()
-    if op == "health":
-        try:
-            return 200, service._build_health_payload(), None, None
-        except Exception as exc:
-            return _err(500, "health_build_failed", str(exc)) + (None, None)
-    if op == "security.snapshot":
-        try:
-            return 200, service._build_security_snapshot_payload(), None, None
-        except Exception as exc:
-            return _err(500, "snapshot_build_failed", str(exc)) + (None, None)
-    if op == "users.directory":
-        try:
+    if op not in OWNER_OP_FAILURES:
+        raise proto.ChannelError("op_not_allowed")
+    service = su_env["styd.odoo.bridge.service"].sudo()
+    try:
+        if op == "health":
+            return 200, service._build_health_payload(owner_uid=owner_uid), None, None
+        if op == "security.snapshot":
+            return 200, service._build_security_snapshot_payload(owner_uid=owner_uid), None, None
+        if op == "users.directory":
             payload = service._build_user_directory_snapshot_payload()
             return 200, payload, len(payload.get("users") or []), None
-        except Exception as exc:
-            return _err(500, "user_directory_build_failed", str(exc)) + (None, None)
-    if op == "users.search":
-        q = args.get("q")
-        q = q[:USERS_SEARCH_MAX_LEN] if isinstance(q, str) else None
-        try:
+        if op == "users.search":
+            q = args.get("q")
+            q = q[:USERS_SEARCH_MAX_LEN] if isinstance(q, str) else None
             payload = service._build_user_search_payload(q)
             return 200, payload, payload.get("count"), None
-        except Exception as exc:
-            return _err(500, "user_search_failed", str(exc)) + (None, None)
-    if op == "capabilities":
-        try:
-            return 200, service._build_capability_snapshot_payload(), None, None
-        except Exception as exc:
-            return _err(500, "capability_snapshot_build_failed", str(exc)) + (None, None)
-    raise proto.ChannelError("op_not_allowed")
+        return 200, service._build_capability_snapshot_payload(owner_uid=owner_uid), None, None
+    except Exception as exc:
+        code, message = OWNER_OP_FAILURES[op]
+        _logger.warning("STYD channel: %s failed (error_type=%s)", op, type(exc).__name__)
+        return _err(500, code, message) + (None, None)
 
 
-def _run_member_op(env, op, args):
+def _run_member_op(env, op, args, owner_uid=None):
     orm = env["styd.odoo.bridge.orm"]
+    mode = {"member_rights": True, "owner_uid": owner_uid}
     model = args.get("model")
     detail = "model=%s" % str(model)[:64]
     try:
         if op == "orm.models":
-            models_list = orm._orm_list_models()
+            models_list = orm._orm_list_models(**mode)
             return 200, {"ok": True, "access_mode": ORM_MEMBER_ACCESS_MODE, "models": models_list}, len(models_list), None
         if op == "orm.fields":
-            fields_list = orm._orm_model_fields(model)
+            fields_list = orm._orm_model_fields(model, **mode)
             body = {"ok": True, "access_mode": ORM_MEMBER_ACCESS_MODE, "model": model, "fields": fields_list}
             return 200, body, len(fields_list), detail
         if op == "orm.search_read":
@@ -295,6 +315,7 @@ def _run_member_op(env, op, args):
                 tz_mode=args.get("tz_mode"),
                 lang=args.get("lang"),
                 company_ids=args.get("company_ids"),
+                **mode
             )
         else:
             result = orm._orm_read_group(
@@ -308,6 +329,7 @@ def _run_member_op(env, op, args):
                 tz_mode=args.get("tz_mode"),
                 lang=args.get("lang"),
                 company_ids=args.get("company_ids"),
+                **mode
             )
         body = {"ok": True, "access_mode": ORM_MEMBER_ACCESS_MODE, "model": model}
         body.update(result)
@@ -344,8 +366,12 @@ def discuss_read_guard(su_env, pairing_id, user, args):
             or question.state not in DISCUSS_ACTIVE_STATES:
         raise proto.ChannelError("discuss_question_unknown",
                                  "This read is not for an open Discuss question of this member.")
-    if question.shared and args.get("model") in ORM_HR_MODELS:
-        return _err(400, "model_not_allowed", DISCUSS_HR_SHARED_DETAIL) + (None, "model=%s" % str(args.get("model"))[:64])
+    model = args.get("model")
+    hr = model in ORM_HR_MODELS or (
+        model == ORM_TIMESHEET_MODEL
+        and not su_env["styd.odoo.bridge.orm"]._orm_journal_items_only(args.get("domain"), model))
+    if question.shared and hr:
+        return _err(400, "model_not_allowed", DISCUSS_HR_SHARED_DETAIL) + (None, "model=%s" % str(model)[:64])
     return None
 
 
@@ -372,6 +398,7 @@ def execute_request(dbname, pairing, fields, args, timeout_ms=None, registry=Non
             su_env = api.Environment(cr, SUPERUSER_ID, {})
             if not _truthy(icp_get(su_env["ir.config_parameter"], ICP_ENABLED, "False")):
                 raise proto.ChannelError("bridge_disabled", "The Bridge is switched off in Odoo.")
+            check_pairing_approved(su_env, pairing.get("pairing_id"))
             user = check_member(su_env, member_uid, op, pairing.get("owner_uid"))
             if op == "health" or op in proto.OWNER_ONLY_OPS:
                 status, body, rows, detail = _run_owner_op(su_env, op, args, pairing.get("owner_uid"))
@@ -380,8 +407,8 @@ def execute_request(dbname, pairing, fields, args, timeout_ms=None, registry=Non
                 if guarded:
                     status, body, rows, detail = guarded
                 else:
-                    env = api.Environment(cr, user.id, member_context(user, pairing.get("owner_uid")))
-                    status, body, rows, detail = _run_member_op(env, op, args)
+                    env = api.Environment(cr, user.id, member_context(user))
+                    status, body, rows, detail = _run_member_op(env, op, args, pairing.get("owner_uid"))
         out.update(ok=True, status=status, body=body)
         audit.update(
             outcome="granted" if status == 200 else ("error" if status >= 500 else "denied"),

@@ -189,6 +189,15 @@ MESSAGES = {
         "nl": "{shown} van {total} rijen getoond.",
         "pt": "A mostrar {shown} de {total} linhas.",
     },
+    "pairing_waiting": {
+        "en": "A Speak To Your Database workspace asks to connect to this Odoo: {name} (workspace id {ref}, email domain of the person who typed the code: {domain}). Nothing is read until you approve it in Speak To Your Database Bridge > Connect without opening a port. If you did not start this pairing, refuse it there.",
+        "fr": "Un espace Speak To Your Database demande à se connecter à cet Odoo : {name} (id d'espace {ref}, domaine e-mail de la personne qui a saisi le code : {domain}). Rien n'est lu tant que vous ne l'approuvez pas dans Speak To Your Database Bridge > Connect without opening a port. Si vous n'avez pas lancé cet appairage, refusez-le là.",
+        "es": "Un espacio de Speak To Your Database pide conectarse a este Odoo: {name} (id de espacio {ref}, dominio de correo de quien escribió el código: {domain}). No se lee nada hasta que lo apruebe en Speak To Your Database Bridge > Connect without opening a port. Si no inició esta vinculación, recházela allí.",
+        "de": "Ein Speak To Your Database-Arbeitsbereich möchte sich mit diesem Odoo verbinden: {name} (Arbeitsbereich-ID {ref}, E-Mail-Domain der Person, die den Code eingegeben hat: {domain}). Es wird nichts gelesen, bis Sie ihn unter Speak To Your Database Bridge > Connect without opening a port genehmigen. Wenn Sie diese Kopplung nicht gestartet haben, lehnen Sie sie dort ab.",
+        "it": "Uno spazio Speak To Your Database chiede di collegarsi a questo Odoo: {name} (id spazio {ref}, dominio e-mail di chi ha digitato il codice: {domain}). Non viene letto nulla finché non lo approva in Speak To Your Database Bridge > Connect without opening a port. Se non ha avviato questo abbinamento, lo rifiuti lì.",
+        "nl": "Een Speak To Your Database-werkruimte vraagt verbinding met deze Odoo: {name} (werkruimte-id {ref}, e-maildomein van wie de code typte: {domain}). Er wordt niets gelezen tot u het goedkeurt in Speak To Your Database Bridge > Connect without opening a port. Hebt u deze koppeling niet gestart, weiger ze daar.",
+        "pt": "Um espaço do Speak To Your Database pede para se ligar a este Odoo: {name} (id do espaço {ref}, domínio de e-mail de quem escreveu o código: {domain}). Nada é lido até o aprovar em Speak To Your Database Bridge > Connect without opening a port. Se não iniciou esta ligação, recuse-a lá.",
+    },
     "yes": {"en": "Yes", "fr": "Oui", "es": "Sí", "de": "Ja", "it": "Sì", "nl": "Ja", "pt": "Sim"},
     "no": {"en": "No", "fr": "Non", "es": "No", "de": "Nein", "it": "No", "nl": "Nee", "pt": "Não"},
 }
@@ -246,6 +255,35 @@ def redact(text, known_secrets=()):
         out = pattern.sub(HIDDEN, out)
     out = _KEY_VALUE.sub(lambda m: m.group(1) + m.group(2) + HIDDEN, out)
     return out
+
+
+# ---------------------------------------------------------------------------
+# no clickable link in what the bot posts
+# ---------------------------------------------------------------------------
+# An address in an answer is shown, never linked: the scheme is dropped and the
+# dots of the host are bracketed (example[.]com), so neither Odoo nor a mail
+# client turns it into a link.
+_URL_RE = re.compile(r"(?i)\b(?:[a-z][a-z0-9+.-]{1,15}://|www\.)[^\s<>\"']+")
+
+
+def _delink_match(match):
+    text = match.group(0)
+    if "://" in text:
+        text = text.split("://", 1)[1]
+    host, sep, rest = text.partition("/")
+    return host.replace(".", "[.]") + sep + rest
+
+
+def delink(text):
+    """The text with every web address made plain (not clickable)."""
+    if not text:
+        return text
+    return _URL_RE.sub(_delink_match, str(text))
+
+
+def _plain(text, secrets):
+    """Text from STYD as the bot shows it: secrets hidden, addresses not links."""
+    return delink(redact(text, secrets))
 
 
 # ---------------------------------------------------------------------------
@@ -373,7 +411,7 @@ def validate_answer(args):
 
 def _paragraphs(text, secrets):
     parts = []
-    for block in re.split(r"\n\s*\n", redact(text, secrets).strip()):
+    for block in re.split(r"\n\s*\n", _plain(text, secrets).strip()):
         if block.strip():
             lines = [escape(line) for line in block.strip().split("\n")]
             parts.append(Markup("<p>%s</p>") % Markup("<br/>").join(lines))
@@ -392,18 +430,18 @@ def _cell_text(value, lang):
 
 def _table(table, lang, secrets):
     head = Markup("").join(
-        Markup("<th>%s</th>") % redact(col, secrets) for col in table["columns"])
+        Markup("<th>%s</th>") % _plain(col, secrets) for col in table["columns"])
     body = []
     for row in table["rows"]:
         cells = []
         for value in row:
             numeric = isinstance(value, (int, float)) and not isinstance(value, bool)
-            cell = redact(_cell_text(value, lang), secrets)
+            cell = _plain(_cell_text(value, lang), secrets)
             cells.append((Markup('<td class="text-end">%s</td>') if numeric else Markup("<td>%s</td>")) % cell)
         body.append(Markup("<tr>%s</tr>") % Markup("").join(cells))
     html = Markup("")
     if table.get("title"):
-        html += Markup("<p><strong>%s</strong></p>") % redact(table["title"], secrets)
+        html += Markup("<p><strong>%s</strong></p>") % _plain(table["title"], secrets)
     html += Markup('<table class="table table-sm table-bordered"><thead><tr>%s</tr></thead><tbody>%s</tbody></table>') % (
         head, Markup("").join(body))
     total = table.get("total_rows")
@@ -427,7 +465,7 @@ def render_answer(answer, user_lang, secrets=()):
     html = Markup("")
     if answer.get("understood_as"):
         html += Markup("<p><em>%s: %s</em></p>") % (
-            say("understood_as", lang), redact(answer["understood_as"], secrets))
+            say("understood_as", lang), _plain(answer["understood_as"], secrets))
     if answer.get("text"):
         html += _paragraphs(answer["text"], secrets)
     for table in answer.get("tables") or []:
@@ -438,3 +476,10 @@ def render_answer(answer, user_lang, secrets=()):
 def bot_line(key, lang):
     """One of the bot's own lines, as a message body."""
     return Markup("<p>%s</p>") % say(key, lang)
+
+
+def pairing_waiting_line(lang, name, ref, domain):
+    """The line every Odoo admin gets when a pairing waits for approval. The
+    values come from STYD: escaped, addresses not links."""
+    text = say("pairing_waiting", lang, name=delink(name or "-"), ref=ref or "-", domain=delink(domain or "-"))
+    return Markup("<p>%s</p>") % text
