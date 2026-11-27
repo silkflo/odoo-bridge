@@ -13,3 +13,5 @@ from . import test_discuss
 from . import test_channel_settings
 from . import test_hardening
 from . import test_directory_and_version
+from . import test_join_link
+from . import test_contract_more
