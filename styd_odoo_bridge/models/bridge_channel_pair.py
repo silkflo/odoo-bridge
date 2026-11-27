@@ -390,6 +390,9 @@ class StydOdooBridgeChannelWizard(models.TransientModel):
             return _("STYD did not recognise this pairing; retrying every 10 minutes.")
         if code in ("module_too_old", "protocol_unsupported"):
             return _("Update the Bridge from the Odoo Apps store.")
+        if code == "pairing_moved":
+            return _("STYD has this pairing for another database: this one was copied or moved, so it "
+                     "does not connect. Unpair it here, then pair again if this database should answer STYD.")
         if code in ("ok", "paired"):
             return _("Connected.")
         return _("Connecting (%s).", code or "starting")
@@ -467,8 +470,9 @@ class StydOdooBridgeChannelWizard(models.TransientModel):
             "module_version": channel.module_version(),
             "odoo_series": channel.odoo_series(),
             "db_uuid": settings["db_uuid"],
-            "db_name": self.env.cr.dbname,
-            "company_name": owner.company_id.name or "",
+            # STYD refuses a pair message whose names are over 128 characters.
+            "db_name": (self.env.cr.dbname or "")[:PAIR_LABEL_MAX],
+            "company_name": (owner.company_id.name or "")[:PAIR_LABEL_MAX],
             "public_url": settings.get("public_url"),
         }
         dbname, row_id, code_hash = self.env.cr.dbname, row.id, proto.pair_code_hash(code)
