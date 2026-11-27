@@ -1,4 +1,4 @@
-"""M1: the channel core (leader lock, keeper, hello, polls, backoff, clock offset)."""
+"""The channel core (leader lock, keeper, hello, polls, backoff, clock offset)."""
 
 import time
 

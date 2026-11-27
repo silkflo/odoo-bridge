@@ -1,4 +1,4 @@
-"""Bridge channel executor (B2 step M2): runs one verified request inside Odoo.
+"""Bridge channel executor: runs one verified request inside Odoo.
 
 Each request:
   * runs in its own cursor, ``SET TRANSACTION READ ONLY`` and a local
@@ -71,7 +71,7 @@ def dumps(payload):
 
 # ---------------------------------------------------------------------------
 # limits (section 10): 4 threads, a queue of 16, a token bucket of 40 calls/s
-# with bursts of 60 (S4 open point 8: one engine question is 22 to 25 reads, so
+# with bursts of 60 (one STYD question is 22 to 25 reads, so
 # the former 10/s burst 20 answered `busy` on every question after the first).
 # The bucket is two system parameters, read by the leader every tick.
 # ---------------------------------------------------------------------------

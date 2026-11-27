@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- List view (Odoo 17 uses <tree>). Read-only: no create/edit/delete. -->
+    <!-- List view (<tree> up to Odoo 17). Read-only: no create/edit/delete. -->
     <record id="view_styd_bridge_access_log_list" model="ir.ui.view">
         <field name="name">styd.odoo.bridge.access.log.list</field>
         <field name="model">styd.odoo.bridge.access.log</field>

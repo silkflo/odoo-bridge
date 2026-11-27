@@ -13,7 +13,11 @@
       "work_email",
       "work_phone",
       "user_id",
-      "tz"
+      "tz",
+      "leave_manager_id",
+      "attendance_manager_id",
+      "expense_manager_id",
+      "resource_calendar_id"
     ],
     "hr.department": [
       "id",
@@ -103,7 +107,16 @@
       "task_id",
       "department_id",
       "company_id",
-      "holiday_id"
+      "holiday_id",
+      "global_leave_id"
+    ],
+    "resource.calendar.leaves": [
+      "id",
+      "date_from",
+      "date_to",
+      "calendar_id",
+      "company_id",
+      "resource_id"
     ]
   },
   "company_scope": {
@@ -147,6 +160,11 @@
     "account.analytic.line": {
       "kind": "employees",
       "field": "company_id"
+    },
+    "resource.calendar.leaves": {
+      "kind": "company",
+      "field": "company_id",
+      "allowEmpty": true
     }
   }
 }
