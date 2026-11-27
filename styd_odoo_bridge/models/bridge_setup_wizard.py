@@ -192,3 +192,9 @@ class StydOdooBridgeSetupWizard(models.TransientModel):
         # Revoking the token disables the bridge as a safe default.
         self._set_param("styd_odoo_bridge.enabled", "False")
         return self._reopen()
+
+    def action_open_access_logs(self):
+        self._check_admin()
+        return self.env["ir.actions.actions"]._for_xml_id(
+            "styd_odoo_bridge.action_styd_bridge_access_log"
+        )

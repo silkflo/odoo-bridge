@@ -186,6 +186,24 @@ nothing, wrong types) is `bad_answer`.
   this is defence in depth.
 - Order in the conversation: "Looking it up…" first (after the ack), then the answer.
 
+### 4.1b Askers not linked yet: the join link
+
+An Odoo user who is not linked to a STYD member yet gets no answer. STYD sends a `refused` answer whose
+`refusal.code` is one of:
+
+| `refusal.code` | Sent when | What the module shows |
+|---|---|---|
+| `join_required` | a conversation only the asker reads | `refusal.message` as text: the personal join link is on a line of its own |
+| `ask_in_direct_message` | a conversation others read | `refusal.message` as text (no link) |
+| `join_limit` | too many links asked for in an hour | `refusal.message` as text |
+
+- The link goes through the same filters as every answer: it is shown as plain text, scheme dropped and the
+  host's dots bracketed (`app[.]example[.]com/join/odoo?t=…`). The token is never hidden: none of its parts
+  has a secret's shape (§4.1).
+- A `join_required` answer may carry a top-level `action` (`{type: "open_url", label, url}`, a button).
+  This version ignores it: `action` is not read, stored, logged or shown. The text line keeps the link.
+- Nothing is read in Odoo for such a question, and nothing else changes on the module's side.
+
 ### 4.2 `discuss.delivered` (module → hub, `POST /bridge/v1/event`)
 
 [M] After each verified `discuss_answer`, the module reports what became of it:
