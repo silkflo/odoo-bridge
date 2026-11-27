@@ -7,7 +7,7 @@ from odoo.tests.common import TransactionCase
 
 from odoo.addons.styd_odoo_bridge.models.bridge_orm import StydOrmError
 
-EXPECTED_MANIFEST_VERSION = "17.0.0.10.2"
+EXPECTED_MANIFEST_VERSION = "17.0.0.11.0"
 
 
 @tagged("post_install", "-at_install")
@@ -341,7 +341,7 @@ class TestStydOrmBridge(TransactionCase):
             "project.project", "project.task", "project.tags",
             "mrp.production", "mrp.workorder", "mrp.bom", "mrp.bom.line", "mrp.routing",
             "maintenance.equipment", "maintenance.request", "maintenance.team",
-            # M-R2 (B0_AUDIT): what STYD reads on an API key
+            # What STYD reads on an API key
             "pos.order", "pos.order.line", "pos.session", "pos.config", "pos.payment",
             "pos.payment.method", "report.pos.order", "restaurant.table",
             "account.bank.statement", "account.bank.statement.line", "account.partial.reconcile",

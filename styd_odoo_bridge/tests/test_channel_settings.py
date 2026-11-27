@@ -1,4 +1,4 @@
-"""S4 open points 6 and 8: the leader sees settings changes within its tick, and
+"""The leader sees settings changes within its tick, and
 the channel's token bucket holds one engine question (and the next ones)."""
 
 import time
@@ -69,7 +69,7 @@ class TestChannelSettings(ChannelCase):
         self.assertFalse(bucket.take())
 
     def test_04_one_engine_question_and_the_next_are_not_busy(self):
-        """22 to 25 reads per question (S4 bench). The old 10/s burst 20 refused
+        """22 to 25 reads per question (measured). The old 10/s burst 20 refused
         the reads above 20 at once, and every question after the first waited."""
         now = [0.0]
         old = ex.TokenBucket(rate=10, burst=20, clock=lambda: now[0])

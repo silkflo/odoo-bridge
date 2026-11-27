@@ -23,7 +23,7 @@ def _envelope(t="request", op="health", member_uid=7, secret=SECRET_A, ts=179543
 
 @tagged("post_install", "-at_install")
 class TestChannelProtocolVectors(TransactionCase):
-    """B2_PROTOCOL_VECTORS.json (the hub tests against the same file)."""
+    """tests/data/b2_protocol_vectors.json (the hub tests against the same file)."""
 
     @classmethod
     def setUpClass(cls):

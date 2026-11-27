@@ -1,4 +1,4 @@
-"""M-R2 to M-R5: the read policy STYD uses on an API key (odooReadPolicy.ts),
+"""The read policy STYD uses on an API key,
 on the Bridge: the wider model allowlist, the named many2many exceptions, a
 validated ``lang`` and an ordered ``company_ids`` (company first)."""
 
@@ -46,7 +46,7 @@ class TestReadPolicy(TransactionCase):
             fn(*args, **kwargs)
         self.assertEqual(ctx.exception.code, code)
 
-    # -- M-R2 ----------------------------------------------------------------------
+    # -- the wider model allowlist ----------------------------------------------
     def test_r2_allowlist_widened(self):
         for model in R2_MODELS:
             self.assertIn(model, self.orm.MODEL_ALLOWLIST, model)
@@ -85,7 +85,7 @@ class TestReadPolicy(TransactionCase):
         self.assertEqual(out["records"][0]["rate"], 1.25)
         self.assertIn("res.currency.rate", [m["model"] for m in self.orm._orm_list_models()])
 
-    # -- M-R3 ----------------------------------------------------------------------
+    # -- the named many2many exceptions -----------------------------------------
     def test_r3_group_only_many2many(self):
         task = _meta(user_ids=dict(M2M, relation="res.users"), tag_ids=dict(M2M, relation="project.tags"))
         aml = _meta(tax_ids=dict(M2M, relation="account.tax"))
@@ -142,7 +142,7 @@ class TestReadPolicy(TransactionCase):
         self.assertCode("field_not_allowed", self.orm._orm_validate_group_by, product,
                         ["product_template_attribute_value_ids"], model="product.product")
 
-    # -- M-R4 ----------------------------------------------------------------------
+    # -- lang -------------------------------------------------------------------
     def test_r4_lang_validated(self):
         for bad in ("xx_XX", "de_DE", 12, ["en_US"], "en_US; DROP"):
             self.assertCode("lang_invalid", self.orm._orm_search_read, model="res.partner", lang=bad)
@@ -164,7 +164,7 @@ class TestReadPolicy(TransactionCase):
                                           domain=[["id", "=", partner.id]])["groups"]
         self.assertEqual(groups[0]["country_id"][1], "Pays Styd")
 
-    # -- M-R5 ----------------------------------------------------------------------
+    # -- company_ids ------------------------------------------------------------
     def _companies(self):
         admin = self.env.ref("base.user_admin")
         icp_set(self.env["ir.config_parameter"].sudo(), "styd_odoo_bridge.connector_owner_user_id", str(admin.id))

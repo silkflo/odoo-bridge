@@ -1,4 +1,4 @@
-"""M2: the executor (member rule, no sudo, read-only cursor, route bodies, limits, audit)."""
+"""The executor (member rule, no sudo, read-only cursor, route bodies, limits, audit)."""
 
 import threading
 import uuid
@@ -99,7 +99,7 @@ class TestChannelExecutor(ChannelCase):
         orm = self.env["styd.odoo.bridge.orm"].sudo()
         out = self.run_op("orm.models", member=self.admin)
         self.assertEqual(out["body"]["access_mode"], "member_rights")
-        # M-R6: the channel also lists the HR models (member rights only); the rest is the route's list.
+        # The channel also lists the HR models (member rights only); the rest is the route's list.
         self.assertEqual([m["model"] for m in out["body"]["models"] if m["model"] not in ORM_HR_MODELS],
                          [m["model"] for m in orm._orm_list_models()])
         out = self.run_op("orm.fields", args={"model": "res.partner"})
@@ -223,7 +223,7 @@ class TestChannelExecutor(ChannelCase):
         self.assertNotIn("styd_bridge_connector_owner_uid", ctx)
 
     def test_15_lang_and_company_ids_in_member_mode(self):
-        """M-R4/M-R5 over the channel: validated against the member's own languages and companies."""
+        """lang and company_ids over the channel: validated against the member's own languages and companies."""
         args = {"model": "res.partner", "fields": ["name"], "limit": 1}
         out = self.run_op("orm.search_read", args=dict(args, lang="xx_XX"))
         self.assertEqual((out["status"], out["body"]["error"]), (400, "lang_invalid"))
@@ -287,7 +287,7 @@ class TestChannelExecutor(ChannelCase):
         pool = ex.ChannelExecutor(self.dbname)
         self.addCleanup(pool.shutdown, True)
         self.assertEqual(pool.capacity, 4 + 16)
-        self.assertEqual((pool.bucket.rate, pool.bucket.burst), (40.0, 60.0))  # S4 open point 8
+        self.assertEqual((pool.bucket.rate, pool.bucket.burst), (40.0, 60.0))  # one question's reads
 
     # -- audit ---------------------------------------------------------------------------------
     def test_40_audit_rows(self):
