@@ -1,4 +1,4 @@
-"""A fake STYD hub for the module's tests (B2 protocol, the hub's side).
+"""A fake STYD hub for the module's tests (the channel protocol, the hub's side).
 
 A real HTTP server on 127.0.0.1 (random port) speaking /bridge/v1/pair, /poll,
 /result and /event: pair sessions and proof of possession, upstream signature,

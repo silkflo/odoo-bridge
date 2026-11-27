@@ -1,11 +1,11 @@
 # Discuss assistant: the channel contract (protocol 1, feature `discuss.v1`)
 
 Status: contract for the 0.11.0 release, 2026-11-24. Module side built and tested on Odoo 17.0
-(`styd_odoo_bridge`, branch `claude/b2-hr-discuss-17`). **The STYD side (hub and colours) implements
+(`styd_odoo_bridge`). **The STYD side (hub and colours) implements
 everything not marked [M].** [M] marks what the module does.
 
-It extends the Bridge channel protocol version 1 (STYD repo, `docs/internal/bridge/B2_PROTOCOL.md`, "the
-protocol" below). Nothing in the protocol changes meaning: the additions are one hello field, two event
+It extends the Bridge channel protocol version 1 (STYD's protocol
+specification, "the protocol" below). Nothing in the protocol changes meaning: the additions are one hello field, two event
 kinds, one hub-to-module message type, one optional read argument and a few error codes. The protocol number
 stays 1. A hub that does not know them keeps working (it ignores the unknown hello field and answers the
 unknown event kinds with `{"t":"ack","ignored":true}`, which the module turns into a polite "not available").
@@ -240,7 +240,7 @@ member's own Odoo rights. Each such request adds one argument:
 | Check | Refusal |
 |---|---|
 | the question exists, belongs to this pairing, is still open (waiting to be sent, or sent and not answered), and `member_uid` is its asker | `ok:false`, `error.code` = `discuss_question_unknown` (new, protocol §9.1: a bug or a replay; never retry) |
-| the conversation is **shared** (§6) and the model is an HR model (`hr.employee.public`, `hr.department`, `hr.leave*`, `hr.work.entry.type`, `hr.attendance`) | `ok:true`, status 400, `{"ok":false,"error":"model_not_allowed","detail":"HR is answered only in a direct message with the assistant."}` |
+| the conversation is **shared** (§6) and the model is an HR model (`hr.employee.public`, `hr.department`, `hr.leave*`, `hr.work.entry.type`, `hr.attendance`, `resource.calendar.leaves`) | `ok:true`, status 400, `{"ok":false,"error":"model_not_allowed","detail":"HR is answered only in a direct message with the assistant."}` |
 
 Reads without `discuss_question_id` are unchanged (older modules ignore the argument, as routes ignore
 unknown keys). STYD **must** tag every read it makes for a Discuss question, and must not reuse cached read
