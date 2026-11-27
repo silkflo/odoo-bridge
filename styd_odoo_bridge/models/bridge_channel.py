@@ -1,6 +1,6 @@
-"""Bridge outbound channel (B2 step M1): Odoo opens a connection OUT to STYD.
+"""Bridge outbound channel: Odoo opens a connection OUT to STYD.
 
-Shape (docs: STYD repo, docs/internal/bridge/B2_PROTOCOL.md):
+Shape (Bridge channel protocol, version 1):
   * a one-minute ``ir.cron`` watchdog (and a trigger at boot) calls
     ``ensure_runner(dbname)`` in whatever process runs crons;
   * ``ensure_runner`` starts at most one ``ChannelRunner`` daemon thread per
@@ -109,7 +109,7 @@ def resolve_verify(ca_bundle):
     return ca_bundle
 
 
-# The parameters the running leader must see within its tick (S4 open point 6).
+# The parameters the running leader must see within its tick.
 # ``get_param`` is cached per process and the leader's process clears that cache
 # only when it runs a cron job, so a corrected hub URL or CA bundle took up to
 # 75 s. ``PairingStore.load`` reads these straight from the table instead.
