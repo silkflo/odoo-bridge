@@ -1,4 +1,4 @@
-"""M3: pairing (code, pair session, proof of possession), secret storage, unpair
+"""Pairing (code, pair session, proof of possession), secret storage, unpair
 both ways, rotation, settings."""
 
 import threading

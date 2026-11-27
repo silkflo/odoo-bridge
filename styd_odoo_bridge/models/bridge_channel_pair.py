@@ -1,4 +1,4 @@
-"""Bridge channel pairing (B2 step M3): code, pair session, proof of possession,
+"""Bridge channel pairing: code, pair session, proof of possession,
 unpair and rotate from Odoo, and the admin wizard.
 
 The pairing code is made with ``secrets.choice``, shown once to an Odoo admin

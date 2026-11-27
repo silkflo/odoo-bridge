@@ -1,4 +1,4 @@
-"""M-R6: HR in the allowlist, exactly STYD's API-key HR read (odooHrAccess.ts):
+"""HR in the allowlist, exactly STYD's API-key HR read:
 the same models, the same field lists, the same fields left out. Read over the
 outbound channel only, as the asking member's own Odoo user (no sudo, read-only
 cursor); the sudo HTTP routes refuse it."""
@@ -15,11 +15,12 @@ from odoo.addons.styd_odoo_bridge.models.bridge_orm import (
 
 from .channel_common import GROUPS, ChannelCase
 
-# STYD's lists, copied by hand from odooHrAccess.ts (origin/main): a change on
+# STYD's lists, copied by hand from STYD's HR read: a change on
 # either side must be deliberate.
 STYD_HR_FIELDS = {
     "hr.employee.public": {"id", "name", "active", "department_id", "job_id", "job_title", "parent_id",
-                           "company_id", "work_email", "work_phone", "user_id", "tz"},
+                           "company_id", "work_email", "work_phone", "user_id", "tz", "leave_manager_id",
+                           "attendance_manager_id", "expense_manager_id", "resource_calendar_id"},
     "hr.department": {"id", "name", "complete_name", "parent_id", "manager_id", "company_id", "active"},
     "hr.leave.report.calendar": {"id", "employee_id", "department_id", "company_id", "state", "duration",
                                  "start_datetime", "stop_datetime", "request_date_from", "request_date_to"},
@@ -33,7 +34,9 @@ STYD_HR_FIELDS = {
                             "leaves_taken", "date_from", "date_to", "state", "holiday_status_id",
                             "work_entry_type_id", "type_request_unit"},
     "hr.attendance": {"id", "employee_id", "check_in", "check_out", "worked_hours"},
+    "resource.calendar.leaves": {"id", "date_from", "date_to", "calendar_id", "company_id", "resource_id"},
 }
+PUBLIC_HOLIDAYS = [["resource_id", "=", False]]
 class MemberOrm:
     """The ORM as the channel calls it for a member: the entry points with
     ``member_rights=True`` and the pairing's owner."""
@@ -279,7 +282,8 @@ class TestHrRead(ChannelCase):
             meta = self.env[model].fields_get()
             fields = [f for f in ORM_HR_FIELDS[model] if f in meta and f != "id"]
             try:
-                out = orm._orm_search_read(model, fields=fields, limit=5)
+                domain = PUBLIC_HOLIDAYS if model == "resource.calendar.leaves" else None
+                out = orm._orm_search_read(model, fields=fields, domain=domain, limit=5)
             except Exception as exc:  # an AccessError is Odoo's own answer, not the wall's
                 self.assertNotIsInstance(exc, StydOrmError, (model, getattr(exc, "code", exc)))
                 continue
@@ -313,6 +317,98 @@ class TestHrRead(ChannelCase):
         self.assertEqual({r["id"] for r in att["body"]["records"]}, {att2.id},
                          "attendance is scoped through the employee's company")
 
+
+    def test_23_public_holidays_and_employee_managers(self):
+        """Public holidays (resource.calendar.leaves with no resource), with STYD's
+        company scope and the asker's own rights; never a person's leave row. The
+        directory's manager and schedule fields, where the version has them."""
+        company2 = self.env["res.company"].create({"name": "STYD HR holidays second"})
+        self.officer.write({"company_ids": [Command.link(company2.id)]})
+        first = self.officer.company_id
+        Holidays = self.env["resource.calendar.leaves"]
+        calendar1 = first.resource_calendar_id or self.env["resource.calendar"].create(
+            {"name": "STYD calendar 1", "company_id": first.id})
+        calendar2 = self.env["resource.calendar"].create({"name": "STYD calendar 2", "company_id": company2.id})
+        h1 = Holidays.create({"name": "STYD holiday 1", "calendar_id": calendar1.id,
+                              "date_from": "2026-05-01 00:00:00", "date_to": "2026-05-01 23:59:59"})
+        h2 = Holidays.create({"name": "STYD holiday 2", "calendar_id": calendar2.id,
+                              "date_from": "2026-05-08 00:00:00", "date_to": "2026-05-08 23:59:59"})
+        self.assertEqual((h1.company_id, h2.company_id), (first, company2))
+        personal = Holidays.create({"name": "STYD personal leave row", "calendar_id": calendar1.id,
+                                    "resource_id": self.emp_other.resource_id.id,
+                                    "date_from": "2026-05-11 00:00:00", "date_to": "2026-05-11 23:59:59"})
+        ours = [h1.id, h2.id, personal.id]
+        fields = ["date_from", "date_to", "calendar_id", "company_id"]
+        for user in (self.plain, self.officer):
+            domain = [["id", "in", ours], ["resource_id", "=", False]]
+            out = self.run_op("orm.search_read", {"model": "resource.calendar.leaves", "fields": fields,
+                                                  "domain": domain}, user)
+            self.assertEqual(out["status"], 200, out["body"])
+            self.assertEqual(out["body"]["access_mode"], "member_rights")
+            got = {r["id"] for r in out["body"]["records"]}
+            expected = self.odoo_ids(user, "resource.calendar.leaves",
+                                     [("id", "in", ours), ("resource_id", "=", False),
+                                      ("company_id", "in", user.company_ids.ids)])
+            self.assertEqual(got, expected, user.login)
+            self.assertIn(h1.id, got, user.login)
+            self.assertNotIn(personal.id, got, user.login)
+            self.assertTrue(all(set(r) == {"id"} | set(fields) for r in out["body"]["records"]))
+            # Not public-holidays-only: refused, however it is written.
+            for bad in ([["id", "in", ours]], [["resource_id", "!=", False]],
+                        ["|", ["resource_id", "=", False], ["id", "in", ours]],
+                        ["!", ["resource_id", "!=", False]]):
+                out = self.run_op("orm.search_read", {"model": "resource.calendar.leaves", "fields": fields,
+                                                      "domain": bad}, user)
+                self.assertEqual(out["status"], 400, bad)
+                self.assertIn(out["body"]["error"], ("field_not_allowed", "domain_invalid"), bad)
+            out = self.run_op("orm.read_group", {"model": "resource.calendar.leaves", "group_by": ["company_id"],
+                                                 "domain": [["id", "in", ours]]}, user)
+            self.assertEqual((out["status"], out["body"]["error"]), (400, "field_not_allowed"))
+            out = self.run_op("orm.search_read", {"model": "resource.calendar.leaves", "fields": ["name"],
+                                                  "domain": PUBLIC_HOLIDAYS}, user)
+            self.assertEqual((out["status"], out["body"]["error"]), (400, "field_not_allowed"))
+        # STYD's company scope on top of Odoo's rules: no company, or one of the read's.
+        args = {"model": "resource.calendar.leaves", "fields": ["company_id"],
+                "domain": [["id", "in", ours], ["resource_id", "=", False]]}
+        ids = {r["id"] for r in self.run_op("orm.search_read", dict(args, company_ids=[first.id]),
+                                            self.officer)["body"]["records"]}
+        self.assertEqual(ids, {h1.id})
+        ids = {r["id"] for r in self.run_op("orm.search_read", dict(args, company_ids=[company2.id]),
+                                            self.officer)["body"]["records"]}
+        self.assertEqual(ids, {h2.id})
+        # The sudo routes refuse it; resource.calendar itself stays closed.
+        self.assertRefused({"model_not_allowed"}, self.env["styd.odoo.bridge.orm"].sudo()._orm_search_read,
+                           "resource.calendar.leaves", fields=["date_from"], domain=PUBLIC_HOLIDAYS)
+        out = self.run_op("orm.search_read", {"model": "resource.calendar", "fields": ["name"]}, self.officer)
+        self.assertEqual((out["status"], out["body"]["error"]), (400, "model_not_allowed"))
+        # The directory's manager and schedule fields: read and filtered as the member.
+        self.emp_plain.write({"parent_id": self.emp_officer.id})
+        # Where the version has them, and as far as Odoo's own field groups let this user read them.
+        public = self.env["hr.employee.public"]._fields
+        present = [f for f in ("leave_manager_id", "attendance_manager_id", "expense_manager_id",
+                               "resource_calendar_id") if f in public]
+        self.assertIn("resource_calendar_id", present)
+        visible = self.env["hr.employee.public"].with_user(self.plain).fields_get()
+        for field in [f for f in present if f not in visible]:
+            out = self.run_op("orm.search_read", {"model": "hr.employee.public", "fields": ["name", field]},
+                              self.plain)
+            self.assertEqual((out["status"], out["body"]["error"]), (400, "field_not_allowed"), field)
+        present = [f for f in present if f in visible]
+        out = self.run_op("orm.search_read", {"model": "hr.employee.public", "fields": ["name"] + present,
+                                              "domain": [["id", "=", self.emp_plain.id]]}, self.plain)
+        self.assertEqual(out["status"], 200, out["body"])
+        row = out["body"]["records"][0]
+        self.assertEqual(set(row), {"id", "name"} | set(present))
+        self.assertEqual(row["resource_calendar_id"] and row["resource_calendar_id"][0],
+                         self.emp_plain.resource_calendar_id.id or False)
+        for field in present:
+            value = self.emp_plain[field].id
+            if not value:
+                continue
+            out = self.run_op("orm.search_read", {"model": "hr.employee.public", "fields": ["name"],
+                                                  "domain": [[field, "=", value],
+                                                             ["id", "=", self.emp_plain.id]]}, self.plain)
+            self.assertEqual({r["id"] for r in out["body"]["records"]}, {self.emp_plain.id}, field)
 
 @tagged("post_install", "-at_install")
 class TestPayOnAnalyticLines(ChannelCase):

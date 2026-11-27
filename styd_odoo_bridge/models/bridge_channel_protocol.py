@@ -1,4 +1,4 @@
-"""Bridge channel protocol, version 1 (B2): the wire formats, in one place.
+"""Bridge channel protocol, version 1: the wire formats, in one place.
 
 Pure Python: no Odoo import, no I/O, no logging, no clock (callers pass
 ``now_ms``). The hub (STYD, TypeScript) implements the same functions; both

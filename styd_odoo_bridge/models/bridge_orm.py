@@ -117,10 +117,10 @@ ORM_MODEL_ALLOWLIST = frozenset({
     "maintenance.request",
     "maintenance.team",
 
-    # M-R2: every model STYD reads on an API key (odooReadPolicy.ts and its
+    # Every model STYD reads on an API key (its read policy and its
     # area lists), so one add-on upgrade covers them. STYD's switches keep
     # deciding what is used. HR is not here: it has its own walled list
-    # (ORM_HR_FIELDS, M-R6), read over the channel only.
+    # (ORM_HR_FIELDS), read over the channel only.
     # Point of Sale
     "pos.order",
     "pos.order.line",
@@ -154,8 +154,8 @@ ORM_MODEL_ALLOWLIST = frozenset({
     "res.currency.rate",
 })
 
-# M-R6: HR, exactly what STYD reads on an API key (odooHrAccess.ts
-# ODOO_HR_FIELDS), with the same fields left out: a per-model field ALLOWLIST,
+# HR, exactly what STYD reads on an API key (its HR field
+# lists), with the same fields left out: a per-model field ALLOWLIST,
 # never a denylist. Every field a read touches (returned, filtered, ordered,
 # grouped, summed) must be listed; a read must name its fields. mobile_phone,
 # every pay, cost or private field stays out for everyone: the wall takes no
@@ -165,9 +165,14 @@ ORM_MODEL_ALLOWLIST = frozenset({
 # with model_not_allowed. hr.employee itself stays out for good
 # (hr.employee.public is the view with no private column).
 ORM_HR_FIELDS = {
+    # leave_manager_id, attendance_manager_id (17+), expense_manager_id: who each
+    # employee's time off, attendance and expenses go to; resource_calendar_id: the
+    # schedule whose public holidays are the employee's. Where the version has them.
+    # resource.calendar itself is never read.
     "hr.employee.public": (
         "id", "name", "active", "department_id", "job_id", "job_title", "parent_id", "company_id",
         "work_email", "work_phone", "user_id", "tz",
+        "leave_manager_id", "attendance_manager_id", "expense_manager_id", "resource_calendar_id",
     ),
     "hr.department": ("id", "name", "complete_name", "parent_id", "manager_id", "company_id", "active"),
     # start_datetime / stop_datetime on 15 to 19, request_date_from / request_date_to on 20.
@@ -191,10 +196,18 @@ ORM_HR_FIELDS = {
         "date_from", "date_to", "state", "holiday_status_id", "work_entry_type_id", "type_request_unit",
     ),
     "hr.attendance": ("id", "employee_id", "check_in", "check_out", "worked_hours"),
+    # PUBLIC HOLIDAYS only: the same model holds every person's validated leave
+    # (resource_id set), never read here (see ORM_HR_PUBLIC_HOLIDAYS).
+    "resource.calendar.leaves": ("id", "date_from", "date_to", "calendar_id", "company_id", "resource_id"),
 }
 ORM_HR_MODELS = frozenset(ORM_HR_FIELDS)
 
-# STYD's company scope per HR model (odooHrAccess.ts ODOO_HR_COMPANY_SCOPE):
+# A read of resource.calendar.leaves keeps to public holidays: its domain holds
+# ["resource_id", "=", False] in a plain AND (no "|" and no "!" that could reach
+# a row with a resource). Odoo gives every internal user these rows.
+ORM_HR_PUBLIC_HOLIDAYS = "resource.calendar.leaves"
+
+# STYD's company scope per HR model:
 # (field, rows with no company allowed). None: configuration with no company.
 # "employees": scoped through the employee's company (attendance).
 ORM_HR_COMPANY_SCOPE = {
@@ -207,6 +220,9 @@ ORM_HR_COMPANY_SCOPE = {
     "hr.leave.type": ("company_id", True),
     "hr.work.entry.type": None,
     "hr.attendance": "employees",
+    # A public holiday belongs to its calendar's company; one with no company
+    # applies to every company.
+    "resource.calendar.leaves": ("company_id", True),
 }
 
 # Pay on an analytic line: a timesheet line's `amount` is the employee's cost.
@@ -216,15 +232,18 @@ ORM_HR_COMPANY_SCOPE = {
 # journal item of an analytic line is ``move_id``: ["move_id", "!=", False] there.
 ORM_PAY_ON_LINES = {"account.analytic.line": frozenset({"amount"})}
 
-# Timesheet lines follow the HR rules (odooHrAccess.ts, the 9th model of its
+# Timesheet lines follow the HR rules (the 9th model of STYD's HR
 # list): a read of account.analytic.line that is not journal-items-only (the
 # check above) is HR. The HTTP routes (sudo) refuse it; over the channel it is
-# read as the member, names its fields, touches only these 11 and is scoped to
+# read as the member, names its fields, touches only these 12 and is scoped to
 # the employees of the read's companies (and the line's own company).
+# global_leave_id (project_timesheet_holidays): the public holiday Odoo wrote the
+# line for, as holiday_id is the time off; where the version has it (a field the
+# database does not have is refused like any unknown field).
 ORM_TIMESHEET_MODEL = "account.analytic.line"
 ORM_TIMESHEET_FIELDS = (
     "id", "employee_id", "user_id", "date", "unit_amount", "name", "project_id", "task_id",
-    "department_id", "company_id", "holiday_id",
+    "department_id", "company_id", "holiday_id", "global_leave_id",
 )
 # Same shape as ORM_HR_COMPANY_SCOPE: the employees of the companies, and the line's company.
 ORM_TIMESHEET_COMPANY_SCOPE = ("employees", "company_id")
@@ -258,7 +277,7 @@ ORM_GROUPABLE_FIELD_TYPES = frozenset({
 
 ORM_NUMERIC_FIELD_TYPES = frozenset({"integer", "float", "monetary"})
 
-# M-R3: the named many2many exceptions of STYD's odooReadPolicy.ts, exactly.
+# The named many2many exceptions of STYD's read policy, exactly.
 # Each is one field on one model, to one relation; the same name on any other
 # model stays refused, and so does any other many2many.
 # Group-by only (Odoo names each group, so the related model is never read);
@@ -279,7 +298,7 @@ ORM_RETURNED_M2M = {
     "product.product": "product_template_attribute_value_ids",
 }
 
-# M-R5: at most this many companies in an ordered company_ids.
+# At most this many companies in an ordered company_ids.
 ORM_MAX_COMPANY_IDS = 50
 
 ORM_ALLOWED_AGG_FUNCS = frozenset({"sum", "avg", "max", "min"})
@@ -384,7 +403,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
         if not isinstance(model_name, str):
             raise StydOrmError("model_not_allowed", "Model is not allowed by this bridge.")
         if model_name in ORM_HR_MODELS:
-            # M-R6: HR only as the asking member, over the outbound channel.
+            # HR only as the asking member, over the outbound channel.
             if not self._orm_member_rights():
                 raise StydOrmError(
                     "model_not_allowed",
@@ -442,7 +461,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
         return []
 
     # ------------------------------------------------------------------
-    # M-R6: the HR wall (odooHrAccess.ts) and pay on analytic lines
+    # The HR wall and pay on analytic lines
     # ------------------------------------------------------------------
     def _orm_hr_company_domain(self, model_name, model, companies):
         """STYD's company scope for an HR model (on top of Odoo's own rules)."""
@@ -510,11 +529,15 @@ class StydOdooBridgeOrm(models.AbstractModel):
         """A plain AND domain (no "|" or "!") with [<journal item>, "!=", False].
         Also used on a raw domain (the shared-conversation guard): anything
         malformed is not journal-items-only."""
-        field = self._orm_journal_item_field(model)
+        return self._orm_plain_and_with(domain, (self._orm_journal_item_field(model), "!=", False))
+
+    def _orm_plain_and_with(self, domain, leaf):
+        """A plain AND domain (no "|" or "!") holding ``leaf`` (its value compared with ``is``)."""
         leaves = domain if isinstance(domain, (list, tuple)) else []
         plain = not any(isinstance(t, str) and t in ("|", "!") for t in leaves)
+        field, op, value = leaf
         return plain and any(
-            isinstance(t, (list, tuple)) and len(t) == 3 and t[0] == field and t[1] == "!=" and t[2] is False
+            isinstance(t, (list, tuple)) and len(t) == 3 and t[0] == field and t[1] == op and t[2] is value
             for t in leaves)
 
     def _orm_default_fields_without_pay(self, model, fields, safe_fields, domain):
@@ -535,6 +558,10 @@ class StydOdooBridgeOrm(models.AbstractModel):
             for fname in touched:
                 if fname not in allowed:
                     raise StydOrmError("field_not_allowed", "Field not allowed for HR: %s." % _short(fname))
+        if model == ORM_HR_PUBLIC_HOLIDAYS and not self._orm_plain_and_with(domain, ("resource_id", "=", False)):
+            raise StydOrmError(
+                "field_not_allowed",
+                "Public holidays only: add [\"resource_id\", \"=\", false] (a plain AND domain).")
         pay = ORM_PAY_ON_LINES.get(model)
         if pay and pay.intersection(touched):
             if not self._orm_journal_items_only(domain, model):
@@ -545,7 +572,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
 
     def _orm_m2m_pair(self, table, model, field, info):
         """True when (model, field) is the named pair of ``table``, as a stored
-        many2many to the named relation (odooReadPolicy.ts' isXxxGroup)."""
+        many2many to the named relation (as in STYD's read policy)."""
         pair = table.get(model) if model else None
         return bool(pair) and pair[0] == field and info.get("type") == "many2many" \
             and info.get("relation") == pair[1] and bool(info.get("store"))
@@ -776,7 +803,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
         return self.env["styd.odoo.bridge.service"]._get_bridge_tz(owner_uid=self._orm_owner_uid())
 
     def _orm_resolve_lang(self, lang=None):
-        """M-R4: a language for the read's names, or None (the default). Only an
+        """A language for the read's names, or None (the default). Only an
         active res.lang code is accepted."""
         if lang in (None, ""):
             return None
@@ -785,7 +812,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
         return lang
 
     def _orm_resolve_companies(self, company_ids=None):
-        """M-R5: the companies a read runs for, in order (the first is the read's
+        """The companies a read runs for, in order (the first is the read's
         company: on 18+ company-dependent values such as account codes are that
         company's). Without company_ids: the scope as before. With them: an
         ordered list of distinct ids, all inside the scope (the connector
@@ -993,7 +1020,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
     def _orm_list_models(self, member_rights=False, owner_uid=None):
         self = self._orm_mode(member_rights, owner_uid)  # this read's mode, from the arguments
         out = []
-        # M-R6: HR models are listed only over the channel (as the member); the
+        # HR models are listed only over the channel (as the member); the
         # sudo routes never list or read them.
         names = self.MODEL_ALLOWLIST | ORM_HR_MODELS if self._orm_member_rights() else self.MODEL_ALLOWLIST
         for model_name in sorted(names):
@@ -1025,7 +1052,7 @@ class StydOdooBridgeOrm(models.AbstractModel):
             if self._orm_is_forbidden_field(fname):
                 continue
             if hr_allowed is not None and fname not in hr_allowed:
-                continue  # M-R6: only the wall's fields are described
+                continue  # only the wall's fields are described
             info = meta[fname]
             ftype = info.get("type")
             out.append({
