@@ -2,8 +2,7 @@
 Odoo administrator; timesheet lines follow the HR rules; channel answers only
 reach internal users; bot answers carry no link; only the module posts as the
 bot; fixed error messages; member rights and the owner as explicit arguments;
-one free bot line per user per minute; the Discuss pairing list for admins only.
-See docs/B2_HARDENING.md."""
+one free bot line per user per minute; the Discuss pairing list for admins only."""
 
 import inspect
 import json
@@ -335,6 +334,25 @@ class TestTimesheetsAreHr(HardeningCase):
                                                                "aggregates": ["unit_amount:sum"]})
         self.assertEqual(out["body"]["error"], "field_not_allowed")
         out = self.run_request(row, op="orm.read_group", args={"model": TIMESHEET, "group_by": ["employee_id"],
+                                                               "aggregates": ["unit_amount:sum"]})
+        self.assertEqual(out["status"], 200, out)
+
+    def test_t05_global_leave_id_where_the_field_exists(self):
+        """global_leave_id (the public holiday a line was written for): read and filtered
+        over the channel where this Odoo has it, refused like any unknown field elsewhere."""
+        self._timesheet_setup()
+        row = self.bound_pairing()
+        self.assertIn("global_leave_id", orm_mod.ORM_TIMESHEET_FIELDS)
+        args = {"model": TIMESHEET, "fields": ["name", "global_leave_id"],
+                "domain": [["name", "like", "STYD ts "], ["global_leave_id", "=", False]]}
+        out = self.run_request(row, op="orm.search_read", args=args)
+        if "global_leave_id" not in self.env[TIMESHEET]._fields:
+            self.assertEqual((out["status"], out["body"]["error"]), (400, "field_not_allowed"))
+            return
+        self.assertEqual(out["status"], 200, out)
+        self.assertEqual({r["name"] for r in out["body"]["records"]}, {"STYD ts here"})
+        self.assertTrue(all(set(r) == {"id", "name", "global_leave_id"} for r in out["body"]["records"]))
+        out = self.run_request(row, op="orm.read_group", args={"model": TIMESHEET, "group_by": ["global_leave_id"],
                                                                "aggregates": ["unit_amount:sum"]})
         self.assertEqual(out["status"], 200, out)
 

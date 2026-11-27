@@ -26,9 +26,8 @@ except ImportError:
 MAJOR = int(release.version_info[0])
 MODULE_PREFIX = "odoo.addons.styd_odoo_bridge."
 
-SETUP_ACTIONS = {"action_save_settings", "action_generate_token", "action_rotate_token", "action_revoke_token"}
-if MAJOR >= 17:
-    SETUP_ACTIONS |= {"action_open_access_logs"}
+SETUP_ACTIONS = {"action_save_settings", "action_generate_token", "action_rotate_token", "action_revoke_token",
+                 "action_open_access_logs"}
 if MAJOR >= 19:
     SETUP_ACTIONS |= {"action_open_bridge_status"}
 STATUS_ACTIONS = {"action_refresh_status", "action_open_access_logs", "action_open_connection_setup"}
