@@ -48,8 +48,9 @@
                     <field name="generated_token" readonly="1" nolabel="1"/>
                     <p class="mt-2 mb-1">
                         Paste this token into Speak To Your Database &#8594; Settings &#8594; Connection now:<br/>
-                        <a href="https://speaktoyourdatabase.com/settings?tab=connections"
-                           target="_blank" rel="noreferrer noopener">https://speaktoyourdatabase.com/settings?tab=connections</a>
+                        <a href="https://speaktoyourdatabase.com/settings?tab=connections&amp;utm_source=odoo-apps&amp;utm_medium=bridge-setup&amp;utm_content=token"
+                           target="_blank" rel="noreferrer noopener">https://speaktoyourdatabase.com/settings?tab=connections</a><br/>No Speak To Your Database account yet? <a href="https://speaktoyourdatabase.com/?utm_source=odoo-apps&amp;utm_medium=bridge-setup&amp;utm_content=signup"
+                           target="_blank" rel="noreferrer noopener">Create one first</a>, then come back with this token.
                     </p>
                     <p class="mb-0">
                         It is stored in Odoo only as a hash, so once you leave this page it cannot be
@@ -92,8 +93,19 @@
                     </ol>
                     <p>
                         Open Speak To Your Database connection settings:<br/>
-                        <a href="https://speaktoyourdatabase.com/settings?tab=connections"
+                        <a href="https://speaktoyourdatabase.com/settings?tab=connections&amp;utm_source=odoo-apps&amp;utm_medium=bridge-setup&amp;utm_content=setup"
                            target="_blank" rel="noreferrer noopener">https://speaktoyourdatabase.com/settings?tab=connections</a>
+                    </p>
+                    <p>
+                        No Speak To Your Database account yet? You need one to ask questions.
+                        <a href="https://speaktoyourdatabase.com/?utm_source=odoo-apps&amp;utm_medium=bridge-setup&amp;utm_content=signup"
+                           target="_blank" rel="noreferrer noopener">Create an account</a>
+                        (you can try it on sample data), then come back to step 3.
+                    </p>
+                    <p>
+                        Odoo on localhost, a private network, plain http or behind Cloudflare?
+                        Use <strong>Connect without opening a port</strong> in this menu instead:
+                        no port to open, no certificate, no firewall change.
                     </p>
                     <p class="text-muted">
                         The raw token is shown only once at generation; it is never displayed

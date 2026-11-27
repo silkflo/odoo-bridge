@@ -80,6 +80,16 @@ COUNTED_STATES = ("pending", "sent", "done", "refused", "failed", "timeout")
 OPEN_STATES = ("pending", "sent")
 
 
+# The conversation kinds of the discuss.ask contract. Any other channel type (a
+# live chat with a website visitor, a WhatsApp conversation...) is sent as a
+# "channel": a conversation others read.
+WIRE_KINDS = ("chat", "channel", "group")
+
+
+def wire_kind(channel_type):
+    return channel_type if channel_type in WIRE_KINDS else "channel"
+
+
 def _int(raw, default=0):
     try:
         value = int(str(raw or "").strip())
@@ -389,9 +399,9 @@ class StydDiscussQuestion(models.Model):
             "member_uid": self.user_id.id,
             "conversation": {
                 "key": "discuss.channel:%d" % self.channel_id.id,
-                "kind": self.conversation_kind or "chat",
+                "kind": wire_kind(self.conversation_kind or "chat"),
                 "shared": bool(self.shared),
-                "asked_in": (self.origin_channel_id or self.channel_id).channel_type,
+                "asked_in": wire_kind((self.origin_channel_id or self.channel_id).channel_type),
             },
             "lang": self.lang or "en_US",
             "tz": self.tz or "UTC",
