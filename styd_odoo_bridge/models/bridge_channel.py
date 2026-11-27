@@ -62,8 +62,14 @@ REFRESH_S = 10             # leader: re-read pairings, settings (fresh), lock he
 SEEN_GC_S = 60
 STATUS_WRITE_S = 60        # last_seen_at written at most once a minute
 NOT_PAIRED_RETRY_S = 600
+# A hello refused because the hub pinned another database (a copy or a move):
+# wait at least this long, or the hub's retry_after_s when it says more.
+PAIRING_MOVED_RETRY_S = 300
 TOO_OLD_RETRY_S = 3600
 DEFAULT_RETRY_AFTER_S = 60
+
+# The hello's ``instance``: made once per Odoo process (protocol section 16).
+PROCESS_INSTANCE = proto.new_instance_id()
 
 _RUNNERS = {}
 _RUNNERS_LOCK = threading.Lock()
@@ -337,7 +343,9 @@ class PairingStream:
         self.status = "starting"
         self._status_written = None
         self._last_seen_write = 0.0
-        self.instance = proto.new_instance_id()
+        # One value for the life of this Odoo process: the hub delivers a Discuss
+        # answer only to the instance that was live when the question was asked.
+        self.instance = PROCESS_INSTANCE
         self.threads = []
         self.stats = {"polls": 0, "requests": 0, "results": 0, "pongs": 0}
 
@@ -460,6 +468,15 @@ class PairingStream:
                 for msg in data.get("messages") or []:
                     self.dispatch(msg)
             return True
+        if status == 409 and code == "pairing_moved":
+            # The hub pinned another database to this pairing: this one is a copy or was
+            # moved. Stop polling, say so in the wizard, never retry before retry_after_s.
+            self._session_lost(gen)
+            retry = data.get("retry_after_s")
+            retry = retry if isinstance(retry, (int, float)) and not isinstance(retry, bool) else 0
+            self.pause_until = time.monotonic() + min(max(float(retry), PAIRING_MOVED_RETRY_S), 3600.0)
+            self._set_status("pairing_moved")
+            return False
         if status == 409 and not with_hello:  # hello_required: resend at once with a hello
             self._session_lost(gen)
             return False
@@ -646,6 +663,10 @@ class PairingStream:
             code = "pairing_not_approved"
         else:
             code, question_id = discuss_deliver(self.runner.registry, self.pairing_id, fields["member_uid"], args)
+        if question_id is None:
+            # The hub refuses a delivered event without a question id: nothing to tell it.
+            _logger.info("STYD discuss: an answer without a valid question id was dropped (%s)", code)
+            return
         self.post_event({
             "t": "event", "kind": "discuss.delivered", "id": fields["id"],
             "question_id": question_id, "ok": code == "ok", "code": code,
